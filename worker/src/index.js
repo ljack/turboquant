@@ -48,17 +48,34 @@ export default {
     }
 
     const wantStream = body.stream === true;
+    const requestedModel = body.model || 'auto';
 
     // Cap message count
     const trimmed = messages.slice(-12);
 
-    // Models to try in order
-    const models = [
+    // Allowed free models (whitelist for safety)
+    const allowedModels = [
       'qwen/qwen3.6-plus-preview:free',
       'arcee-ai/trinity-large-preview:free',
       'meta-llama/llama-3.3-70b-instruct:free',
+      'google/gemma-3-27b-it:free',
+      'mistralai/mistral-small-3.2-24b-instruct:free',
+      'deepseek/deepseek-r1-0528:free',
       'openrouter/free',
     ];
+
+    // If user picked a specific model, use just that; otherwise fallback chain
+    let models;
+    if (requestedModel !== 'auto' && allowedModels.includes(requestedModel)) {
+      models = [requestedModel];
+    } else {
+      models = [
+        'qwen/qwen3.6-plus-preview:free',
+        'arcee-ai/trinity-large-preview:free',
+        'meta-llama/llama-3.3-70b-instruct:free',
+        'openrouter/free',
+      ];
+    }
 
     if (wantStream) {
       return handleStreaming(trimmed, models, env, origin, allowed);

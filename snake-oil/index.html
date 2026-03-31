@@ -571,6 +571,35 @@ body {
 .quiz-score.visible { display: block; }
 .quiz-score .score-num { font-size: 2em; display: block; margin: 8px 0; }
 
+/* ─── Model selector ─── */
+.chat-model-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--green-bg);
+  border-bottom: 1px solid var(--green-pale);
+  font-size: 0.75em;
+}
+.chat-model-bar label {
+  color: var(--text-light);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.chat-model-bar select {
+  flex: 1;
+  padding: 3px 6px;
+  border: 1px solid var(--green-pale);
+  border-radius: 6px;
+  background: white;
+  font-size: 1em;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+}
+.chat-model-bar select:focus { border-color: var(--green-mid); }
+
 /* ─── Chat resize handle ─── */
 .chat-window {
   resize: none; /* we do custom resize */
@@ -1071,6 +1100,18 @@ code {
   <div class="chat-header" id="chatDragHandle">
     <span class="chat-title">TurboQuant Chat</span>
     <button class="chat-close" id="chatCloseBtn">&times;</button>
+  </div>
+  <div class="chat-model-bar">
+    <label for="modelSelect2">Model:</label>
+    <select id="chatModelSelect">
+      <option value="auto">Auto (best available)</option>
+      <option value="qwen/qwen3.6-plus-preview:free">Qwen 3.6 Plus</option>
+      <option value="arcee-ai/trinity-large-preview:free">Arcee Trinity</option>
+      <option value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B</option>
+      <option value="google/gemma-3-27b-it:free">Gemma 3 27B</option>
+      <option value="mistralai/mistral-small-3.2-24b-instruct:free">Mistral Small 3.2</option>
+      <option value="deepseek/deepseek-r1-0528:free">DeepSeek R1</option>
+    </select>
   </div>
   <div class="chat-messages" id="chatMessages">
     <div class="chat-msg bot">
@@ -2750,7 +2791,7 @@ async function streamResponse(messages, bubble) {
   const res = await fetch(WORKER_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, stream: true }),
+    body: JSON.stringify({ messages, stream: true, model: document.getElementById('chatModelSelect').value }),
   });
 
   if (!res.ok) {
