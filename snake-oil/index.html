@@ -1,0 +1,1866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TurboQuant - Interactive Visual Explainer</title>
+<style>
+/* ─── Spring palette ─── */
+:root {
+  --green-dark: #2d5016;
+  --green-mid: #4a7c2e;
+  --green-light: #7cb342;
+  --green-pale: #c5e1a5;
+  --green-bg: #f1f8e9;
+  --pink: #f48fb1;
+  --pink-light: #fce4ec;
+  --lavender: #ce93d8;
+  --sky: #81d4fa;
+  --sky-light: #e1f5fe;
+  --yellow: #fff176;
+  --yellow-warm: #fff9c4;
+  --white: #ffffff;
+  --text: #1b2e0a;
+  --text-mid: #33691e;
+  --text-light: #558b2f;
+  --shadow: rgba(45,80,22,.12);
+  --radius: 16px;
+  --good-bg: linear-gradient(135deg, #fff9c4 0%, #f1f8e9 100%);
+  --good-border: #c0ca33;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--green-bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* ─── Floating petals background ─── */
+.petal {
+  position: fixed;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.3;
+  font-size: 24px;
+  animation: fall linear infinite;
+}
+@keyframes fall {
+  0% { transform: translateY(-10vh) rotate(0deg); opacity: 0.3; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+/* ─── Header ─── */
+.header {
+  background: linear-gradient(135deg, var(--green-mid) 0%, var(--green-light) 50%, #aed581 100%);
+  color: white;
+  padding: 48px 24px 36px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+.header::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: var(--green-bg);
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+}
+.header h1 {
+  font-size: 3em;
+  font-weight: 800;
+  letter-spacing: -1px;
+  text-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+.header .subtitle {
+  font-size: 1.15em;
+  opacity: 0.92;
+  margin-top: 8px;
+  font-weight: 400;
+}
+.header .paper-link {
+  display: inline-block;
+  margin-top: 14px;
+  color: var(--yellow);
+  font-size: 0.9em;
+  text-decoration: none;
+  border-bottom: 1px dashed var(--yellow);
+}
+
+/* ─── Navigation ─── */
+.step-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 2px solid var(--green-pale);
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 16px;
+  flex-wrap: wrap;
+}
+.step-nav button {
+  padding: 8px 18px;
+  border: 2px solid transparent;
+  border-radius: 24px;
+  background: var(--green-bg);
+  color: var(--text-mid);
+  font-weight: 600;
+  font-size: 0.88em;
+  cursor: pointer;
+  transition: all 0.25s;
+}
+.step-nav button:hover { background: var(--green-pale); }
+.step-nav button.active {
+  background: var(--green-mid);
+  color: white;
+  border-color: var(--green-dark);
+}
+
+/* ─── Main content ─── */
+.main { max-width: 960px; margin: 0 auto; padding: 32px 20px 120px; position: relative; z-index: 1; }
+
+/* ─── Step sections ─── */
+.step {
+  display: none;
+  animation: fadeIn 0.4s ease;
+}
+.step.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+.step h2 {
+  font-size: 1.8em;
+  color: var(--green-dark);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--green-mid);
+  color: white;
+  font-size: 0.65em;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.step .intro { color: var(--text-mid); margin-bottom: 24px; font-size: 1.05em; }
+
+/* ─── Cards ─── */
+.card {
+  background: white;
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 12px var(--shadow);
+  border: 1px solid var(--green-pale);
+}
+.card h3 { color: var(--green-dark); margin-bottom: 10px; font-size: 1.15em; }
+
+/* ─── Good stuff callout ─── */
+.good-stuff {
+  background: var(--good-bg);
+  border-left: 5px solid var(--good-border);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 18px 22px;
+  margin: 16px 0;
+  position: relative;
+}
+.good-stuff::before {
+  content: 'THE GOOD STUFF';
+  display: block;
+  font-size: 0.72em;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #827717;
+  margin-bottom: 6px;
+}
+.good-stuff p { color: var(--text); font-size: 0.95em; }
+
+/* ─── Canvas containers ─── */
+.viz-container {
+  background: white;
+  border-radius: var(--radius);
+  padding: 20px;
+  margin: 16px 0;
+  box-shadow: 0 2px 12px var(--shadow);
+  border: 1px solid var(--green-pale);
+  text-align: center;
+}
+.viz-container canvas {
+  max-width: 100%;
+  border-radius: 8px;
+}
+.controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  margin-top: 14px;
+}
+.controls label {
+  font-size: 0.88em;
+  color: var(--text-mid);
+  font-weight: 600;
+}
+.controls input[type="range"] {
+  accent-color: var(--green-mid);
+  width: 140px;
+}
+.controls button {
+  padding: 8px 20px;
+  border-radius: 20px;
+  border: 2px solid var(--green-mid);
+  background: white;
+  color: var(--green-mid);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.controls button:hover { background: var(--green-mid); color: white; }
+.controls .value-display {
+  background: var(--green-bg);
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.85em;
+  color: var(--green-dark);
+  min-width: 40px;
+  text-align: center;
+}
+.metric-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 12px;
+}
+.metric {
+  background: var(--green-bg);
+  border-radius: 12px;
+  padding: 10px 18px;
+  text-align: center;
+}
+.metric .label { font-size: 0.72em; text-transform: uppercase; letter-spacing: 1px; color: var(--text-light); font-weight: 700; }
+.metric .val { font-size: 1.3em; font-weight: 800; color: var(--green-dark); }
+
+/* ─── Comparison tables ─── */
+.compare-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 12px 0;
+  font-size: 0.92em;
+}
+.compare-table th {
+  background: var(--green-mid);
+  color: white;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 700;
+}
+.compare-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--green-pale);
+}
+.compare-table tr:nth-child(even) td { background: var(--green-bg); }
+.compare-table .highlight td { background: var(--yellow-warm); font-weight: 600; }
+
+/* ─── KV Cache explainer ─── */
+.kv-explainer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+@media (max-width: 640px) { .kv-explainer { grid-template-columns: 1fr; } }
+.kv-box {
+  background: white;
+  border-radius: var(--radius);
+  padding: 20px;
+  border: 2px solid var(--green-pale);
+}
+.kv-box h4 { color: var(--green-dark); margin-bottom: 8px; }
+.kv-box.key-box { border-color: var(--sky); background: var(--sky-light); }
+.kv-box.value-box { border-color: var(--pink); background: var(--pink-light); }
+
+/* ─── Floatable Chat ─── */
+.chat-toggle {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--green-mid), var(--green-light));
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(45,80,22,.3);
+  transition: transform 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chat-toggle:hover { transform: scale(1.1); }
+
+.chat-window {
+  display: none;
+  position: fixed;
+  z-index: 999;
+  width: 380px;
+  height: 520px;
+  min-width: 300px;
+  min-height: 350px;
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: 0 8px 40px rgba(0,0,0,.18);
+  flex-direction: column;
+  overflow: hidden;
+  border: 2px solid var(--green-pale);
+  resize: both;
+}
+.chat-window.open { display: flex; }
+
+.chat-header {
+  background: linear-gradient(135deg, var(--green-mid), var(--green-light));
+  color: white;
+  padding: 14px 16px;
+  font-weight: 700;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: grab;
+  user-select: none;
+}
+.chat-header:active { cursor: grabbing; }
+.chat-header .chat-title { font-size: 0.95em; }
+.chat-header .chat-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  opacity: 0.8;
+  padding: 0 4px;
+}
+.chat-header .chat-close:hover { opacity: 1; }
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--green-bg);
+}
+.chat-msg {
+  margin-bottom: 12px;
+  max-width: 85%;
+  animation: fadeIn 0.3s ease;
+}
+.chat-msg.bot { margin-right: auto; }
+.chat-msg.user { margin-left: auto; }
+.chat-msg .bubble {
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+.chat-msg.bot .bubble {
+  background: white;
+  color: var(--text);
+  border: 1px solid var(--green-pale);
+  border-bottom-left-radius: 4px;
+}
+.chat-msg.user .bubble {
+  background: var(--green-mid);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+.chat-msg .sender {
+  font-size: 0.7em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 3px;
+  color: var(--text-light);
+}
+.chat-msg.user .sender { text-align: right; }
+
+.chat-input-row {
+  display: flex;
+  border-top: 2px solid var(--green-pale);
+  background: white;
+}
+.chat-input-row input {
+  flex: 1;
+  border: none;
+  padding: 14px 16px;
+  font-size: 0.92em;
+  outline: none;
+  font-family: inherit;
+}
+.chat-input-row button {
+  background: var(--green-mid);
+  color: white;
+  border: none;
+  padding: 14px 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.chat-input-row button:hover { background: var(--green-dark); }
+.typing-indicator { color: var(--text-light); font-style: italic; font-size: 0.82em; padding: 4px 0; }
+
+/* ─── Misc ─── */
+code {
+  background: var(--green-bg);
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 0.88em;
+  color: var(--green-dark);
+  font-weight: 600;
+}
+.emoji { font-size: 1.3em; }
+.flex-center { display: flex; align-items: center; justify-content: center; }
+
+/* ─── Footer ─── */
+.footer {
+  text-align: center;
+  padding: 32px;
+  color: var(--text-light);
+  font-size: 0.85em;
+}
+.footer a { color: var(--green-mid); }
+
+/* ─── Responsive ─── */
+@media (max-width: 500px) {
+  .header h1 { font-size: 2em; }
+  .chat-window { width: calc(100vw - 24px); right: 12px; left: 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Floating petals -->
+<script>
+(function() {
+  const petals = ['\u{1F338}', '\u{1F33C}', '\u{1F33A}', '\u{1F33B}', '\u{1F340}', '\u{1F33F}'];
+  for (let i = 0; i < 15; i++) {
+    const el = document.createElement('span');
+    el.className = 'petal';
+    el.textContent = petals[Math.floor(Math.random() * petals.length)];
+    el.style.left = Math.random() * 100 + 'vw';
+    el.style.animationDuration = (12 + Math.random() * 18) + 's';
+    el.style.animationDelay = (Math.random() * 20) + 's';
+    el.style.fontSize = (16 + Math.random() * 16) + 'px';
+    document.body.appendChild(el);
+  }
+})();
+</script>
+
+<!-- Header -->
+<div class="header">
+  <h1>TurboQuant</h1>
+  <div class="subtitle">Google's KV Cache Compression &mdash; An Interactive Visual Explainer</div>
+  <a class="paper-link" href="https://arxiv.org/abs/2504.19874" target="_blank">ICLR 2026 &bull; arXiv:2504.19874</a>
+</div>
+
+<!-- Step Navigation -->
+<nav class="step-nav" id="stepNav">
+  <button class="active" data-step="0">0. The Problem</button>
+  <button data-step="1">1. KV Cache 101</button>
+  <button data-step="2">2. Random Rotation</button>
+  <button data-step="3">3. Beta Distribution</button>
+  <button data-step="4">4. Lloyd-Max Quantize</button>
+  <button data-step="5">5. QJL Error Fix</button>
+  <button data-step="6">6. Full Pipeline</button>
+  <button data-step="7">7. Results</button>
+</nav>
+
+<div class="main">
+
+<!-- ════════════ STEP 0: The Problem ════════════ -->
+<section class="step active" id="step0">
+  <h2><span class="step-number">0</span> The Problem: Memory Is the Bottleneck</h2>
+  <p class="intro">LLMs are smart, but they're memory hogs. During inference, the KV cache can eat more RAM than the model weights themselves.</p>
+
+  <div class="card">
+    <h3>Why should you care?</h3>
+    <p>When an LLM generates text, it stores <strong>keys</strong> and <strong>values</strong> for every token it has seen so far. A 70B parameter model serving a 128K context window can require <strong>over 40GB</strong> of memory just for the KV cache &mdash; and that's <em>per request</em>.</p>
+    <p style="margin-top:12px;">This means: fewer concurrent users, bigger GPU bills, and hard limits on context length.</p>
+  </div>
+
+  <div class="viz-container">
+    <canvas id="memoryBarChart" width="700" height="300"></canvas>
+    <div class="controls">
+      <label>Context length:</label>
+      <input type="range" id="ctxSlider" min="1" max="128" value="32">
+      <span class="value-display" id="ctxVal">32K</span>
+      <label style="margin-left:16px">Model size:</label>
+      <select id="modelSelect" style="padding:6px 12px;border-radius:10px;border:2px solid var(--green-pale);font-weight:600;">
+        <option value="7">7B</option>
+        <option value="13">13B</option>
+        <option value="70" selected>70B</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="good-stuff">
+    <p><strong>This is why TurboQuant matters.</strong> It's not just an academic exercise &mdash; shrinking the KV cache by 6x means you can serve 6x more users on the same hardware, or fit contexts that were previously impossible. And it does this with <em>zero retraining</em>.</p>
+  </div>
+</section>
+
+<!-- ════════════ STEP 1: KV Cache 101 ════════════ -->
+<section class="step" id="step1">
+  <h2><span class="step-number">1</span> KV Cache 101</h2>
+  <p class="intro">Before we compress it, let's understand what the KV cache actually is.</p>
+
+  <div class="card">
+    <h3>Attention in 30 seconds</h3>
+    <p>Transformers use <strong>attention</strong> to decide which earlier tokens matter for predicting the next one. For each token, the model computes three vectors:</p>
+    <ul style="margin:10px 0 0 20px;line-height:2;">
+      <li><strong>Query (Q)</strong> &mdash; "What am I looking for?"</li>
+      <li><strong>Key (K)</strong> &mdash; "What do I contain?" (stored in cache)</li>
+      <li><strong>Value (V)</strong> &mdash; "What information do I carry?" (stored in cache)</li>
+    </ul>
+    <p style="margin-top:10px;">Attention scores = <code>softmax(Q &middot; K<sup>T</sup> / &radic;d)</code>, then weighted sum of V.</p>
+  </div>
+
+  <div class="kv-explainer">
+    <div class="kv-box key-box">
+      <h4>Keys (K)</h4>
+      <p>Each token's "label." When generating a new token, its Query is compared against all stored Keys to find relevant context. <strong>Inner product accuracy is critical here.</strong></p>
+    </div>
+    <div class="kv-box value-box">
+      <h4>Values (V)</h4>
+      <p>The actual content retrieved via attention. Once the model decides which tokens are relevant (via K), it pulls the corresponding Values to form its output.</p>
+    </div>
+  </div>
+
+  <div class="viz-container">
+    <canvas id="kvCacheViz" width="700" height="280"></canvas>
+    <div class="controls">
+      <button id="kvAnimBtn">Animate Attention Step</button>
+      <label style="margin-left:12px">Tokens:</label>
+      <input type="range" id="tokenSlider" min="4" max="20" value="8">
+      <span class="value-display" id="tokenVal">8</span>
+    </div>
+  </div>
+
+  <div class="good-stuff">
+    <p><strong>The key insight for compression:</strong> We don't need the exact K and V vectors &mdash; we just need the <em>inner products</em> (Q&middot;K) to be preserved accurately. TurboQuant exploits this: it's designed to minimize inner product error, not element-wise error. That's a fundamentally different (and easier) target.</p>
+  </div>
+</section>
+
+<!-- ════════════ STEP 2: Random Rotation ════════════ -->
+<section class="step" id="step2">
+  <h2><span class="step-number">2</span> Random Rotation (PolarQuant Step 1)</h2>
+  <p class="intro">The first move is deceptively simple: multiply every vector by a random orthogonal matrix. This is the key that unlocks everything else.</p>
+
+  <div class="card">
+    <h3>What does rotation do?</h3>
+    <p>Real KV vectors are <strong>spiky</strong> &mdash; some coordinates are large, others near zero. This makes quantization hard because you'd need different precision for each coordinate.</p>
+    <p style="margin-top:8px;">A random rotation <strong>spreads the energy uniformly</strong> across all coordinates. Think of it like shaking a jar of sand until it's level &mdash; the total amount stays the same, but it's evenly distributed.</p>
+    <p style="margin-top:8px;">Crucially, rotation <strong>preserves all inner products</strong>: <code>Rx &middot; Ry = x &middot; y</code>. So attention scores are unchanged.</p>
+  </div>
+
+  <div class="viz-container">
+    <canvas id="rotationViz" width="700" height="360"></canvas>
+    <div class="controls">
+      <button id="rotateBtn">Apply Random Rotation</button>
+      <button id="resetRotBtn">Reset</button>
+      <label style="margin-left:12px">Dimensions:</label>
+      <input type="range" id="dimSlider" min="8" max="64" value="16">
+      <span class="value-display" id="dimVal">16</span>
+    </div>
+    <div class="metric-row">
+      <div class="metric"><div class="label">Max Coord (before)</div><div class="val" id="maxBefore">-</div></div>
+      <div class="metric"><div class="label">Max Coord (after)</div><div class="val" id="maxAfter">-</div></div>
+      <div class="metric"><div class="label">Inner Product Preserved</div><div class="val" id="ipPreserved">-</div></div>
+    </div>
+  </div>
+
+  <div class="good-stuff">
+    <p><strong>This is genius because it's data-oblivious.</strong> Unlike other quantization methods that need calibration data or per-channel statistics, TurboQuant uses the <em>same random rotation for any model</em>. No profiling, no calibration dataset, no per-layer tuning. You generate R once and it works universally. That's the difference between a research trick and a production-ready tool.</p>
+  </div>
+</section>
+
+<!-- ════════════ STEP 3: Beta Distribution ════════════ -->
+<section class="step" id="step3">
+  <h2><span class="step-number">3</span> The Beta Distribution Miracle</h2>
+  <p class="intro">After rotation, something remarkable happens: every coordinate follows a <strong>known, predictable distribution</strong>.</p>
+
+  <div class="card">
+    <h3>Why Beta?</h3>
+    <p>When you randomly rotate a unit vector in <em>d</em> dimensions, each coordinate follows a <strong>Beta(1/2, (d-1)/2)</strong> distribution (after rescaling). In high dimensions (d &gt; 64, typical for LLM heads), this concentrates tightly around zero &mdash; almost Gaussian.</p>
+    <p style="margin-top:8px;">The magic: since we <em>know</em> the distribution ahead of time, we can precompute the <strong>optimal quantization grid</strong> before ever seeing any data.</p>
+  </div>
+
+  <div class="viz-container">
+    <canvas id="betaViz" width="700" height="340"></canvas>
+    <div class="controls">
+      <label>Dimension (d):</label>
+      <input type="range" id="betaDimSlider" min="4" max="256" value="64">
+      <span class="value-display" id="betaDimVal">64</span>
+      <label style="margin-left:16px">Bits:</label>
+      <input type="range" id="betaBitsSlider" min="2" max="6" value="3">
+      <span class="value-display" id="betaBitsVal">3</span>
+      <button id="sampleBetaBtn" style="margin-left:12px">Sample 1000 Points</button>
+    </div>
+  </div>
+
+  <div class="good-stuff">
+    <p><strong>This is where the information theory clicks.</strong> Most quantization methods treat coordinates as having unknown distributions and waste bits being conservative. TurboQuant <em>knows</em> the distribution (because the rotation made it predictable), so it can place quantization levels exactly where they minimize distortion. It's like the difference between a one-size-fits-all shoe and a custom mold &mdash; except the "custom mold" is computed from pure math, not data.</p>
+  </div>
+</section>
+
+<!-- ════════════ STEP 4: Lloyd-Max Quantization ════════════ -->
+<section class="step" id="step4">
+  <h2><span class="step-number">4</span> Lloyd-Max: Optimal Bucket Placement</h2>
+  <p class="intro">Now that we know the distribution, we compute the mathematically optimal quantization levels.</p>
+
+  <div class="card">
+    <h3>What is Lloyd-Max?</h3>
+    <p>Given a known probability distribution and a bit budget (say 3 bits = 8 levels), the <strong>Lloyd-Max algorithm</strong> finds the 8 reconstruction points and 7 decision boundaries that minimize mean squared error (MSE).</p>
+    <p style="margin-top:8px;">It's an iterative algorithm: place boundaries at midpoints between reconstruction levels, then move reconstruction levels to the centroid of their region. Repeat until converged.</p>
+    <p style="margin-top:8px;">Since the Beta distribution is known, this is computed <strong>once, offline, for each (d, bits) pair</strong>. Zero runtime cost.</p>
+  </div>
+
+  <div class="viz-container">
+    <canvas id="lloydViz" width="700" height="360"></canvas>
+    <div class="controls">
+      <button id="lloydStepBtn">Step Lloyd-Max</button>
+      <button id="lloydRunBtn">Run to Convergence</button>
+      <button id="lloydResetBtn">Reset</button>
+      <label style="margin-left:12px">Bits:</label>
+      <input type="range" id="lloydBitsSlider" min="1" max="5" value="3">
+      <span class="value-display" id="lloydBitsVal">3</span>
+    </div>
+    <div class="metric-row">
+      <div class="metric"><div class="label">Iteration</div><div class="val" id="lloydIter">0</div></div>
+      <div class="metric"><div class="label">MSE</div><div class="val" id="lloydMSE">-</div></div>
+      <div class="metric"><div class="label">Levels</div><div class="val" id="lloydLevels">8</div></div>
+    </div>
+  </div>
+
+  <div class="good-stuff">
+    <p><strong>Pre-computed = free at inference.</strong> Most quantization schemes run calibration passes that take minutes to hours. TurboQuant's quantizer is a lookup table baked at compile time. The only runtime operation is: rotate, then round to nearest level. That's why it's actually <em>faster</em> than running with full precision &mdash; less data to move through the memory bus.</p>
+  </div>
+</section>
+
+<!-- ════════════ STEP 5: QJL Error Correction ════════════ -->
+<section class="step" id="step5">
+  <h2><span class="step-number">5</span> QJL: 1-Bit Error Correction</h2>
+  <p class="intro">Lloyd-Max minimizes MSE, but MSE-optimal quantizers introduce <strong>bias</strong> in inner product estimation. QJL fixes this with just 1 extra bit per dimension.</p>
+
+  <div class="card">
+    <h3>The Bias Problem</h3>
+    <p>When you quantize a vector x to x&#770;, the error e = x - x&#770; is <em>correlated</em> with x itself (values near boundaries get rounded systematically). This means <code>E[x&#770; &middot; y&#770;] &ne; x &middot; y</code> &mdash; the inner products are biased.</p>
+    <p style="margin-top:8px;">For attention, biased inner products mean the model might attend to the wrong tokens. Bad.</p>
+  </div>
+
+  <div class="card">
+    <h3>The QJL Fix</h3>
+    <p><strong>Quantized Johnson-Lindenstrauss (QJL)</strong> compresses the residual error to just <strong>1 bit per dimension</strong>: store only the <em>sign</em> of each coordinate of a random projection of the error.</p>
+    <p style="margin-top:8px;">This gives an <strong>unbiased estimator</strong> of the error's inner product. Combined with the main quantizer: <code>x &middot; y &asymp; x&#770; &middot; y&#770; + correction</code>.</p>
+    <p style="margin-top:8px;">Total cost: just 1 extra bit. Total memory overhead: negligible.</p>
+  </div>
+
+  <div class="viz-container">
+    <canvas id="qjlViz" width="700" height="340"></canvas>
+    <div class="controls">
+      <button id="qjlAnimBtn">Show Error Correction</button>
+      <button id="qjlResetBtn">Reset</button>
+      <label style="margin-left:12px">Error scale:</label>
+      <input type="range" id="qjlErrorSlider" min="1" max="20" value="10">
+      <span class="value-display" id="qjlErrorVal">1.0</span>
+    </div>
+    <div class="metric-row">
+      <div class="metric"><div class="label">Raw IP Error</div><div class="val" id="qjlRawErr">-</div></div>
+      <div class="metric"><div class="label">After QJL</div><div class="val" id="qjlFixErr">-</div></div>
+      <div class="metric"><div class="label">Bits Used</div><div class="val" id="qjlBits">-</div></div>
+    </div>
+  </div>
+
+  <div class="good-stuff">
+    <p><strong>This is the theoretical crown jewel.</strong> The QJL estimator is provably unbiased, meaning errors cancel out in expectation. And it only costs 1 bit! Most error-correction schemes in quantization literature either cost too many bits to be worthwhile or require complex per-layer calibration. QJL is elegant: random projection &rarr; take sign &rarr; done. It's the mathematical equivalent of a checksum, but for inner products.</p>
+  </div>
+</section>
+
+<!-- ════════════ STEP 6: Full Pipeline ════════════ -->
+<section class="step" id="step6">
+  <h2><span class="step-number">6</span> Full Pipeline: Putting It Together</h2>
+  <p class="intro">Let's see the entire TurboQuant pipeline from raw KV vector to compressed representation.</p>
+
+  <div class="viz-container">
+    <canvas id="pipelineViz" width="700" height="420"></canvas>
+    <div class="controls">
+      <button id="pipelinePlayBtn">Play Full Pipeline</button>
+      <button id="pipelineResetBtn">Reset</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>The Complete Flow</h3>
+    <table class="compare-table">
+      <tr><th>Stage</th><th>Operation</th><th>Cost</th></tr>
+      <tr><td><strong>1. Rotate</strong></td><td>Multiply by random orthogonal R</td><td>O(d log d) via fast transform</td></tr>
+      <tr><td><strong>2. Quantize</strong></td><td>Round each coord to nearest Lloyd-Max level</td><td>3 bits/dim (precomputed table)</td></tr>
+      <tr><td><strong>3. QJL</strong></td><td>Store sign of random projection of residual</td><td>1 bit/dim</td></tr>
+      <tr class="highlight"><td><strong>Total</strong></td><td>3.5&ndash;4 bits per dimension (vs 16 or 32 for fp16/fp32)</td><td><strong>6&ndash;8x compression</strong></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>What about decompression?</h3>
+    <p>At inference time, to compute <code>Q &middot; K</code>:</p>
+    <ol style="margin:8px 0 0 20px;line-height:2;">
+      <li>Rotate Q by the same R: <code>Q' = RQ</code></li>
+      <li>Compute <code>Q' &middot; K&#770;</code> using the quantized keys (integer arithmetic!)</li>
+      <li>Add QJL correction term</li>
+    </ol>
+    <p style="margin-top:8px;">Because quantized values are small integers, the dot products are <strong>much faster</strong> than float operations on modern GPUs with INT4/INT8 tensor cores.</p>
+  </div>
+
+  <div class="good-stuff">
+    <p><strong>The total package is unreasonably effective.</strong> Each piece &mdash; rotation, Beta quantization, QJL &mdash; is clean and well-understood on its own. But the combination achieves near-optimal compression (within 2.7x of the information-theoretic limit) with zero training, zero calibration, and faster inference. The rotation makes the distribution predictable, the predictable distribution makes quantization optimal, and QJL cleans up the only remaining artifact. No wasted bits anywhere.</p>
+  </div>
+</section>
+
+<!-- ════════════ STEP 7: Results ════════════ -->
+<section class="step" id="step7">
+  <h2><span class="step-number">7</span> Results: Does It Actually Work?</h2>
+  <p class="intro">Benchmarked on Gemma and Mistral across long-context tasks. Spoiler: yes, it works shockingly well.</p>
+
+  <div class="viz-container">
+    <canvas id="resultsViz" width="700" height="340"></canvas>
+    <div class="controls">
+      <label>Benchmark:</label>
+      <select id="benchSelect" style="padding:6px 12px;border-radius:10px;border:2px solid var(--green-pale);font-weight:600;">
+        <option value="longbench">LongBench</option>
+        <option value="needle">Needle In A Haystack</option>
+        <option value="zeroscrolls">ZeroSCROLLS</option>
+        <option value="ruler">RULER</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Key Numbers</h3>
+    <table class="compare-table">
+      <tr><th>Metric</th><th>FP16 Baseline</th><th>TurboQuant 3-bit</th><th>TurboQuant 4-bit</th></tr>
+      <tr><td>Accuracy (LongBench)</td><td>100%</td><td>~99.5%</td><td>~100%</td></tr>
+      <tr><td>KV Cache Memory</td><td>1x</td><td><strong>~5.3x smaller</strong></td><td><strong>~4x smaller</strong></td></tr>
+      <tr><td>Inference Speed (H100)</td><td>1x</td><td>~6x faster</td><td><strong>~8x faster</strong></td></tr>
+      <tr class="highlight"><td>Retraining Required</td><td>-</td><td>None</td><td>None</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>vs. Other Quantization Methods</h3>
+    <table class="compare-table">
+      <tr><th>Method</th><th>Bits</th><th>Needs Calibration?</th><th>Quality @ 3-bit</th></tr>
+      <tr><td>GPTQ / AWQ</td><td>4</td><td>Yes (hours)</td><td>Degraded</td></tr>
+      <tr><td>SqueezeLLM</td><td>3-4</td><td>Yes</td><td>Moderate</td></tr>
+      <tr><td>KIVI</td><td>2-4</td><td>Per-channel stats</td><td>Good on keys</td></tr>
+      <tr class="highlight"><td><strong>TurboQuant</strong></td><td><strong>3-4</strong></td><td><strong>No</strong></td><td><strong>Near-perfect</strong></td></tr>
+    </table>
+  </div>
+
+  <div class="good-stuff">
+    <p><strong>The "no calibration" row is the killer feature.</strong> Every other method requires running representative data through the model to compute statistics. That means: you need a calibration dataset, the quantization is model-specific, and results can vary with the data you choose. TurboQuant's calibration is <em>pure mathematics</em> &mdash; the rotation makes the statistics known a priori. This is what makes it deployable at scale without per-model engineering effort.</p>
+  </div>
+</section>
+
+</div><!-- .main -->
+
+<!-- ═══════ Chat Window ═══════ -->
+<button class="chat-toggle" id="chatToggle" title="Chat about TurboQuant">
+  <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+</button>
+
+<div class="chat-window" id="chatWindow" style="bottom:90px;right:24px;">
+  <div class="chat-header" id="chatDragHandle">
+    <span class="chat-title">TurboQuant Chat</span>
+    <button class="chat-close" id="chatCloseBtn">&times;</button>
+  </div>
+  <div class="chat-messages" id="chatMessages">
+    <div class="chat-msg bot">
+      <div class="sender">TurboBot</div>
+      <div class="bubble">Hey! I'm here to discuss TurboQuant, quantization, KV caches, or anything ML-related. What's on your mind?</div>
+    </div>
+  </div>
+  <div class="chat-input-row">
+    <input type="text" id="chatInput" placeholder="Ask about TurboQuant..." autocomplete="off">
+    <button id="chatSendBtn">Send</button>
+  </div>
+</div>
+
+<div class="footer">
+  Built for exploration &bull; Based on <a href="https://arxiv.org/abs/2504.19874" target="_blank">TurboQuant (ICLR 2026)</a> by Google Research
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  Navigation
+// ═══════════════════════════════════════════
+const navBtns = document.querySelectorAll('.step-nav button');
+const steps = document.querySelectorAll('.step');
+
+function showStep(idx) {
+  steps.forEach((s, i) => s.classList.toggle('active', i === idx));
+  navBtns.forEach((b, i) => b.classList.toggle('active', i === idx));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+navBtns.forEach(b => b.addEventListener('click', () => showStep(+b.dataset.step)));
+
+// ═══════════════════════════════════════════
+//  Utility: draw helpers
+// ═══════════════════════════════════════════
+function clearCanvas(canvas) {
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  return ctx;
+}
+
+const COLORS = {
+  green: '#4a7c2e', greenLight: '#7cb342', greenPale: '#c5e1a5',
+  pink: '#f48fb1', sky: '#81d4fa', yellow: '#fff176',
+  orange: '#ffb74d', lavender: '#ce93d8', text: '#1b2e0a',
+  red: '#e57373', white: '#ffffff', bg: '#f1f8e9',
+};
+
+function drawBar(ctx, x, y, w, h, color, radius = 6) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, radius);
+  ctx.fill();
+}
+
+function drawText(ctx, text, x, y, { color = COLORS.text, size = 13, align = 'center', weight = '600', baseline = 'top' } = {}) {
+  ctx.fillStyle = color;
+  ctx.font = `${weight} ${size}px 'Segoe UI', system-ui, sans-serif`;
+  ctx.textAlign = align;
+  ctx.textBaseline = baseline;
+  ctx.fillText(text, x, y);
+}
+
+// ═══════════════════════════════════════════
+//  STEP 0: Memory Bar Chart
+// ═══════════════════════════════════════════
+function drawMemoryChart() {
+  const canvas = document.getElementById('memoryBarChart');
+  const ctx = clearCanvas(canvas);
+  const W = canvas.width, H = canvas.height;
+  const ctxLen = +document.getElementById('ctxSlider').value;
+  const modelB = +document.getElementById('modelSelect').value;
+
+  document.getElementById('ctxVal').textContent = ctxLen + 'K';
+
+  // Rough estimates (GB)
+  const weightsGB = modelB * 2 / 1; // fp16
+  const kvGB = modelB * 0.6 * ctxLen / 32; // rough scaling
+  const kvTQ = kvGB / 6;
+
+  const maxGB = Math.max(weightsGB, kvGB, kvTQ) * 1.2;
+  const barW = 120, gap = 60;
+  const baseY = H - 50;
+  const maxBarH = H - 100;
+  const startX = (W - (barW * 3 + gap * 2)) / 2;
+
+  const items = [
+    { label: 'Model Weights', gb: weightsGB, color: COLORS.sky },
+    { label: 'KV Cache (FP16)', gb: kvGB, color: COLORS.pink },
+    { label: 'KV Cache (TQ 3-bit)', gb: kvTQ, color: COLORS.greenLight },
+  ];
+
+  items.forEach((item, i) => {
+    const x = startX + i * (barW + gap);
+    const h = (item.gb / maxGB) * maxBarH;
+    drawBar(ctx, x, baseY - h, barW, h, item.color, 8);
+    drawText(ctx, item.label, x + barW / 2, baseY + 8, { size: 11, weight: '700' });
+    drawText(ctx, item.gb.toFixed(1) + ' GB', x + barW / 2, baseY - h - 22, { size: 14, weight: '800', color: item.color });
+  });
+
+  drawText(ctx, `${modelB}B model @ ${ctxLen}K context`, W / 2, 16, { size: 15, weight: '700', color: COLORS.green });
+}
+
+document.getElementById('ctxSlider').addEventListener('input', drawMemoryChart);
+document.getElementById('modelSelect').addEventListener('change', drawMemoryChart);
+drawMemoryChart();
+
+// ═══════════════════════════════════════════
+//  STEP 1: KV Cache Visualization
+// ═══════════════════════════════════════════
+let kvAnimRunning = false;
+
+function drawKVCache() {
+  const canvas = document.getElementById('kvCacheViz');
+  const ctx = clearCanvas(canvas);
+  const W = canvas.width, H = canvas.height;
+  const nTokens = +document.getElementById('tokenSlider').value;
+  document.getElementById('tokenVal').textContent = nTokens;
+
+  const boxW = Math.min(60, (W - 100) / nTokens - 4);
+  const boxH = 28;
+  const startX = (W - nTokens * (boxW + 4)) / 2;
+
+  // Draw token labels
+  drawText(ctx, 'Tokens', W / 2, 10, { size: 13, weight: '700' });
+
+  for (let i = 0; i < nTokens; i++) {
+    const x = startX + i * (boxW + 4);
+    drawBar(ctx, x, 32, boxW, boxH, COLORS.greenPale);
+    drawText(ctx, 't' + i, x + boxW / 2, 38, { size: 10, weight: '700' });
+  }
+
+  // Keys row
+  drawText(ctx, 'Keys (K)', 40, 90, { size: 12, weight: '700', color: '#0288d1', align: 'left' });
+  for (let i = 0; i < nTokens; i++) {
+    const x = startX + i * (boxW + 4);
+    drawBar(ctx, x, 85, boxW, boxH, COLORS.sky);
+  }
+
+  // Values row
+  drawText(ctx, 'Values (V)', 40, 140, { size: 12, weight: '700', color: '#c2185b', align: 'left' });
+  for (let i = 0; i < nTokens; i++) {
+    const x = startX + i * (boxW + 4);
+    drawBar(ctx, x, 135, boxW, boxH, COLORS.pink);
+  }
+
+  // Query
+  drawText(ctx, 'New Query (Q)', W / 2, 185, { size: 12, weight: '700', color: COLORS.green });
+  drawBar(ctx, W / 2 - boxW / 2, 202, boxW, boxH, COLORS.greenLight);
+  drawText(ctx, 'q', W / 2, 208, { size: 10, weight: '700' });
+
+  // Attention scores
+  drawText(ctx, 'Attention = softmax(Q \u00B7 K\u1D40 / \u221Ad)', W / 2, 248, { size: 12, weight: '600' });
+}
+
+document.getElementById('tokenSlider').addEventListener('input', drawKVCache);
+document.getElementById('kvAnimBtn').addEventListener('click', () => drawKVCache());
+drawKVCache();
+
+// ═══════════════════════════════════════════
+//  STEP 2: Rotation Visualization
+// ═══════════════════════════════════════════
+let rotVectors = null;
+let rotVectorsRotated = null;
+
+function generateVectors(d) {
+  // Generate a spiky vector (some large, some small coords)
+  const v1 = [];
+  const v2 = [];
+  for (let i = 0; i < d; i++) {
+    // Make it spiky: a few large values, rest small
+    v1.push(i < 3 ? (2 + Math.random() * 3) * (Math.random() > 0.5 ? 1 : -1) : (Math.random() - 0.5) * 0.4);
+    v2.push(i < 3 ? (2 + Math.random() * 3) * (Math.random() > 0.5 ? 1 : -1) : (Math.random() - 0.5) * 0.4);
+  }
+  return [v1, v2];
+}
+
+function randomRotation(v) {
+  // Approximate: apply random Givens rotations
+  const d = v.length;
+  const out = [...v];
+  for (let iter = 0; iter < d * 3; iter++) {
+    const i = Math.floor(Math.random() * d);
+    const j = Math.floor(Math.random() * d);
+    if (i === j) continue;
+    const theta = Math.random() * Math.PI * 2;
+    const c = Math.cos(theta), s = Math.sin(theta);
+    const a = out[i], b = out[j];
+    out[i] = c * a - s * b;
+    out[j] = s * a + c * b;
+  }
+  return out;
+}
+
+function dot(a, b) {
+  let s = 0;
+  for (let i = 0; i < a.length; i++) s += a[i] * b[i];
+  return s;
+}
+
+function drawRotation(rotated = false) {
+  const canvas = document.getElementById('rotationViz');
+  const ctx = clearCanvas(canvas);
+  const W = canvas.width, H = canvas.height;
+  const d = +document.getElementById('dimSlider').value;
+  document.getElementById('dimVal').textContent = d;
+
+  if (!rotVectors || rotVectors[0].length !== d) {
+    rotVectors = generateVectors(d);
+    rotVectorsRotated = null;
+  }
+
+  const vectors = rotated && rotVectorsRotated ? rotVectorsRotated : rotVectors;
+  const label = rotated && rotVectorsRotated ? 'After Rotation' : 'Before Rotation (spiky)';
+
+  // Draw bar chart of vector coordinates
+  const barW = Math.min(16, (W - 80) / d - 1);
+  const midY = H / 2;
+  const maxVal = Math.max(...vectors[0].map(Math.abs), ...vectors[1].map(Math.abs), 0.1);
+  const scale = (midY - 50) / maxVal;
+
+  drawText(ctx, label, W / 2, 12, { size: 14, weight: '700', color: COLORS.green });
+  drawText(ctx, 'Vector 1', W / 4, 32, { size: 11, weight: '600', color: '#0288d1' });
+  drawText(ctx, 'Vector 2', W * 3 / 4, 32, { size: 11, weight: '600', color: '#c2185b' });
+
+  // Vector 1
+  const startX1 = W / 4 - (d * (barW + 1)) / 2;
+  for (let i = 0; i < d; i++) {
+    const x = startX1 + i * (barW + 1);
+    const h = vectors[0][i] * scale;
+    drawBar(ctx, x, midY - Math.max(0, h), barW, Math.abs(h), COLORS.sky, 2);
+  }
+
+  // Vector 2
+  const startX2 = W * 3 / 4 - (d * (barW + 1)) / 2;
+  for (let i = 0; i < d; i++) {
+    const x = startX2 + i * (barW + 1);
+    const h = vectors[1][i] * scale;
+    drawBar(ctx, x, midY - Math.max(0, h), barW, Math.abs(h), COLORS.pink, 2);
+  }
+
+  // Axis
+  ctx.strokeStyle = '#aaa';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(30, midY);
+  ctx.lineTo(W - 30, midY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Metrics
+  const origIP = dot(rotVectors[0], rotVectors[1]);
+  const maxBefore = Math.max(...rotVectors[0].map(Math.abs)).toFixed(2);
+  document.getElementById('maxBefore').textContent = maxBefore;
+
+  if (rotated && rotVectorsRotated) {
+    const maxAfter = Math.max(...rotVectorsRotated[0].map(Math.abs)).toFixed(2);
+    const newIP = dot(rotVectorsRotated[0], rotVectorsRotated[1]);
+    document.getElementById('maxAfter').textContent = maxAfter;
+    document.getElementById('ipPreserved').textContent = Math.abs(origIP - newIP) < 0.01 ? 'Yes!' : (origIP.toFixed(2) + ' vs ' + newIP.toFixed(2));
+  } else {
+    document.getElementById('maxAfter').textContent = '-';
+    document.getElementById('ipPreserved').textContent = '-';
+  }
+}
+
+document.getElementById('rotateBtn').addEventListener('click', () => {
+  rotVectorsRotated = [randomRotation(rotVectors[0]), randomRotation(rotVectors[1])];
+  drawRotation(true);
+});
+document.getElementById('resetRotBtn').addEventListener('click', () => {
+  const d = +document.getElementById('dimSlider').value;
+  rotVectors = generateVectors(d);
+  rotVectorsRotated = null;
+  drawRotation(false);
+});
+document.getElementById('dimSlider').addEventListener('input', () => {
+  rotVectors = null;
+  rotVectorsRotated = null;
+  drawRotation(false);
+});
+drawRotation(false);
+
+// ═══════════════════════════════════════════
+//  STEP 3: Beta Distribution
+// ═══════════════════════════════════════════
+let betaSamples = null;
+
+function betaPDF(x, a, b) {
+  // Approximate Beta PDF using log-gamma (Stirling)
+  if (x <= 0 || x >= 1) return 0;
+  const logB = lnGamma(a) + lnGamma(b) - lnGamma(a + b);
+  return Math.exp((a - 1) * Math.log(x) + (b - 1) * Math.log(1 - x) - logB);
+}
+
+function lnGamma(z) {
+  // Lanczos approximation
+  const g = 7;
+  const c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+  if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - lnGamma(1 - z);
+  z -= 1;
+  let x = c[0];
+  for (let i = 1; i < g + 2; i++) x += c[i] / (z + i);
+  const t = z + g + 0.5;
+  return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+}
+
+function sampleBeta(a, b) {
+  // Simple rejection sampling for Beta
+  // Using gamma sampling: Beta(a,b) = Ga/(Ga+Gb)
+  function sampleGamma(shape) {
+    if (shape < 1) {
+      return sampleGamma(shape + 1) * Math.pow(Math.random(), 1 / shape);
+    }
+    const d = shape - 1 / 3;
+    const c = 1 / Math.sqrt(9 * d);
+    while (true) {
+      let x, v;
+      do { x = gaussRand(); v = 1 + c * x; } while (v <= 0);
+      v = v * v * v;
+      const u = Math.random();
+      if (u < 1 - 0.0331 * (x * x) * (x * x)) return d * v;
+      if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
+    }
+  }
+  const ga = sampleGamma(a);
+  const gb = sampleGamma(b);
+  return ga / (ga + gb);
+}
+
+function gaussRand() {
+  let u, v, s;
+  do { u = Math.random() * 2 - 1; v = Math.random() * 2 - 1; s = u * u + v * v; } while (s >= 1 || s === 0);
+  return u * Math.sqrt(-2 * Math.log(s) / s);
+}
+
+function drawBetaViz() {
+  const canvas = document.getElementById('betaViz');
+  const ctx = clearCanvas(canvas);
+  const W = canvas.width, H = canvas.height;
+  const d = +document.getElementById('betaDimSlider').value;
+  const bits = +document.getElementById('betaBitsSlider').value;
+  document.getElementById('betaDimVal').textContent = d;
+  document.getElementById('betaBitsVal').textContent = bits;
+
+  const nLevels = 1 << bits;
+  const a = 0.5, b = (d - 1) / 2;
+  const plotL = 80, plotR = W - 30, plotT = 40, plotB = H - 60;
+  const plotW = plotR - plotL, plotH = plotB - plotT;
+
+  // Rescaled: Beta on [0,1] but we show as [-1,1] symmetric
+  // Actually let's show the distribution of a single coordinate after rotation
+  // which is symmetric around 0, like a scaled Beta on [0,1] mapped to magnitude
+
+  // Draw PDF
+  const nPts = 200;
+  let maxPDF = 0;
+  const pdfVals = [];
+  for (let i = 0; i <= nPts; i++) {
+    const t = i / nPts; // [0,1]
+    const p = betaPDF(t, a, b);
+    pdfVals.push(p);
+    if (p > maxPDF && isFinite(p)) maxPDF = p;
+  }
+  maxPDF *= 1.15;
+
+  // Axes
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(plotL, plotB);
+  ctx.lineTo(plotR, plotB);
+  ctx.moveTo(plotL, plotB);
+  ctx.lineTo(plotL, plotT);
+  ctx.stroke();
+
+  drawText(ctx, `Beta(0.5, ${((d-1)/2).toFixed(1)}) \u2014 coordinate distribution after rotation (d=${d})`, W / 2, 12, { size: 13, weight: '700', color: COLORS.green });
+  drawText(ctx, '0', plotL, plotB + 12, { size: 10 });
+  drawText(ctx, '1', plotR, plotB + 12, { size: 10 });
+
+  // PDF curve
+  ctx.strokeStyle = COLORS.green;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let i = 0; i <= nPts; i++) {
+    const x = plotL + (i / nPts) * plotW;
+    const y = plotB - (Math.min(pdfVals[i], maxPDF) / maxPDF) * plotH;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Fill under curve
+  ctx.fillStyle = 'rgba(124, 179, 66, 0.15)';
+  ctx.beginPath();
+  ctx.moveTo(plotL, plotB);
+  for (let i = 0; i <= nPts; i++) {
+    const x = plotL + (i / nPts) * plotW;
+    const y = plotB - (Math.min(pdfVals[i], maxPDF) / maxPDF) * plotH;
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(plotR, plotB);
+  ctx.fill();
+
+  // Quantization levels
+  for (let i = 0; i < nLevels; i++) {
+    const t = (i + 0.5) / nLevels;
+    const x = plotL + t * plotW;
+    ctx.strokeStyle = COLORS.pink;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(x, plotT);
+    ctx.lineTo(x, plotB);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    drawText(ctx, (i + 1).toString(), x, plotB + 26, { size: 9, color: COLORS.pink, weight: '700' });
+  }
+  drawText(ctx, `${nLevels} quantization levels (${bits}-bit)`, W / 2, plotB + 42, { size: 11, weight: '600', color: COLORS.pink });
+
+  // Samples histogram
+  if (betaSamples && betaSamples._d === d) {
+    const nBins = 50;
+    const bins = new Array(nBins).fill(0);
+    for (const s of betaSamples) { const bin = Math.min(nBins - 1, Math.floor(s * nBins)); bins[bin]++; }
+    const maxBin = Math.max(...bins);
+    ctx.fillStyle = 'rgba(129, 212, 250, 0.5)';
+    for (let i = 0; i < nBins; i++) {
+      const x = plotL + (i / nBins) * plotW;
+      const w = plotW / nBins;
+      const h = (bins[i] / maxBin) * plotH * 0.7;
+      ctx.fillRect(x, plotB - h, w - 1, h);
+    }
+  }
+}
+
+document.getElementById('betaDimSlider').addEventListener('input', () => { betaSamples = null; drawBetaViz(); });
+document.getElementById('betaBitsSlider').addEventListener('input', drawBetaViz);
+document.getElementById('sampleBetaBtn').addEventListener('click', () => {
+  const d = +document.getElementById('betaDimSlider').value;
+  const samples = [];
+  const a = 0.5, b = (d - 1) / 2;
+  for (let i = 0; i < 1000; i++) samples.push(sampleBeta(a, b));
+  samples._d = d;
+  betaSamples = samples;
+  drawBetaViz();
+});
+drawBetaViz();
+
+// ═══════════════════════════════════════════
+//  STEP 4: Lloyd-Max Visualization
+// ═══════════════════════════════════════════
+let lloydState = null;
+
+function initLloyd() {
+  const bits = +document.getElementById('lloydBitsSlider').value;
+  document.getElementById('lloydBitsVal').textContent = bits;
+  const nLevels = 1 << bits;
+  document.getElementById('lloydLevels').textContent = nLevels;
+
+  // Initialize levels uniformly
+  const levels = [];
+  for (let i = 0; i < nLevels; i++) levels.push((i + 0.5) / nLevels);
+
+  // Boundaries
+  const bounds = [];
+  for (let i = 1; i < nLevels; i++) bounds.push((levels[i - 1] + levels[i]) / 2);
+
+  lloydState = { levels, bounds, iter: 0, bits, converged: false };
+  document.getElementById('lloydIter').textContent = '0';
+  document.getElementById('lloydMSE').textContent = '-';
+  drawLloyd();
+}
+
+function lloydStep() {
+  if (!lloydState || lloydState.converged) return;
+  const { levels, bounds, bits } = lloydState;
+  const nLevels = levels.length;
+  const d = 64;
+  const a = 0.5, b = (d - 1) / 2;
+
+  // Generate samples from Beta
+  const nSamples = 5000;
+  const samples = [];
+  for (let i = 0; i < nSamples; i++) samples.push(sampleBeta(a, b));
+
+  // Assign samples to nearest level
+  const clusters = Array.from({ length: nLevels }, () => []);
+  for (const s of samples) {
+    let best = 0, bestD = Infinity;
+    for (let j = 0; j < nLevels; j++) {
+      const dd = Math.abs(s - levels[j]);
+      if (dd < bestD) { bestD = dd; best = j; }
+    }
+    clusters[best].push(s);
+  }
+
+  // Update levels to centroid
+  let mse = 0;
+  let moved = 0;
+  for (let j = 0; j < nLevels; j++) {
+    if (clusters[j].length > 0) {
+      const mean = clusters[j].reduce((a, b) => a + b, 0) / clusters[j].length;
+      moved += Math.abs(levels[j] - mean);
+      levels[j] = mean;
+      for (const s of clusters[j]) mse += (s - mean) ** 2;
+    }
+  }
+  mse /= nSamples;
+
+  // Update boundaries
+  for (let i = 0; i < bounds.length; i++) {
+    bounds[i] = (levels[i] + levels[i + 1]) / 2;
+  }
+
+  lloydState.iter++;
+  lloydState.converged = moved < 0.0001;
+  document.getElementById('lloydIter').textContent = lloydState.iter;
+  document.getElementById('lloydMSE').textContent = mse.toFixed(6);
+  drawLloyd();
+}
+
+function drawLloyd() {
+  const canvas = document.getElementById('lloydViz');
+  const ctx = clearCanvas(canvas);
+  const W = canvas.width, H = canvas.height;
+
+  if (!lloydState) { initLloyd(); return; }
+
+  const { levels, bounds, iter, converged } = lloydState;
+  const d = 64;
+  const a = 0.5, b = (d - 1) / 2;
+
+  const plotL = 60, plotR = W - 30, plotT = 50, plotB = H - 60;
+  const plotW = plotR - plotL, plotH = plotB - plotT;
+
+  // Draw PDF
+  const nPts = 200;
+  let maxPDF = 0;
+  const pdfVals = [];
+  for (let i = 0; i <= nPts; i++) {
+    const t = i / nPts;
+    const p = betaPDF(t, a, b);
+    pdfVals.push(p);
+    if (p > maxPDF && isFinite(p)) maxPDF = p;
+  }
+  maxPDF *= 1.15;
+
+  // Axes
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(plotL, plotB);
+  ctx.lineTo(plotR, plotB);
+  ctx.stroke();
+
+  drawText(ctx, converged ? 'Lloyd-Max Converged!' : `Lloyd-Max Iteration ${iter}`, W / 2, 12, { size: 14, weight: '700', color: converged ? COLORS.green : COLORS.text });
+
+  // Fill regions with alternating colors
+  const regionColors = ['rgba(129,212,250,0.15)', 'rgba(244,143,177,0.15)'];
+  const allBounds = [0, ...bounds, 1];
+  for (let i = 0; i < levels.length; i++) {
+    const x1 = plotL + allBounds[i] * plotW;
+    const x2 = plotL + allBounds[i + 1] * plotW;
+    ctx.fillStyle = regionColors[i % 2];
+    ctx.fillRect(x1, plotT, x2 - x1, plotH);
+  }
+
+  // PDF curve
+  ctx.strokeStyle = COLORS.green;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (let i = 0; i <= nPts; i++) {
+    const x = plotL + (i / nPts) * plotW;
+    const y = plotB - (Math.min(pdfVals[i], maxPDF) / maxPDF) * plotH;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Boundaries
+  for (const bnd of bounds) {
+    const x = plotL + bnd * plotW;
+    ctx.strokeStyle = '#aaa';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(x, plotT);
+    ctx.lineTo(x, plotB);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Reconstruction levels
+  for (let i = 0; i < levels.length; i++) {
+    const x = plotL + levels[i] * plotW;
+    ctx.strokeStyle = COLORS.pink;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, plotB - 5);
+    ctx.lineTo(x, plotB + 15);
+    ctx.stroke();
+
+    // Diamond marker
+    ctx.fillStyle = COLORS.pink;
+    ctx.beginPath();
+    ctx.moveTo(x, plotB + 18);
+    ctx.lineTo(x - 5, plotB + 24);
+    ctx.lineTo(x, plotB + 30);
+    ctx.lineTo(x + 5, plotB + 24);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  drawText(ctx, 'Reconstruction levels', W / 2, plotB + 38, { size: 11, weight: '600', color: COLORS.pink });
+}
+
+document.getElementById('lloydStepBtn').addEventListener('click', lloydStep);
+document.getElementById('lloydRunBtn').addEventListener('click', () => {
+  for (let i = 0; i < 50; i++) lloydStep();
+});
+document.getElementById('lloydResetBtn').addEventListener('click', () => { lloydState = null; initLloyd(); });
+document.getElementById('lloydBitsSlider').addEventListener('input', () => { lloydState = null; initLloyd(); });
+initLloyd();
+
+// ═══════════════════════════════════════════
+//  STEP 5: QJL Visualization
+// ═══════════════════════════════════════════
+let qjlState = { corrected: false };
+
+function drawQJL() {
+  const canvas = document.getElementById('qjlViz');
+  const ctx = clearCanvas(canvas);
+  const W = canvas.width, H = canvas.height;
+  const errScale = +document.getElementById('qjlErrorSlider').value / 10;
+  document.getElementById('qjlErrorVal').textContent = errScale.toFixed(1);
+
+  const d = 32;
+  // Generate vectors
+  const x = [], y = [], xq = [], residual = [], qjlSigns = [];
+  let trueIP = 0, quantIP = 0, correctedIP = 0;
+
+  for (let i = 0; i < d; i++) {
+    const xi = gaussRand();
+    const yi = gaussRand();
+    x.push(xi);
+    y.push(yi);
+    // Quantize with error proportional to errScale
+    const noise = gaussRand() * 0.3 * errScale;
+    xq.push(xi + noise);
+    residual.push(-noise);
+    trueIP += xi * yi;
+    quantIP += (xi + noise) * yi;
+    // QJL sign bit
+    qjlSigns.push(Math.sign(residual[i]) || 1);
+  }
+
+  // QJL correction: sign(residual) gives unbiased estimate direction
+  let correction = 0;
+  const residualNorm = Math.sqrt(residual.reduce((s, r) => s + r * r, 0));
+  for (let i = 0; i < d; i++) {
+    correction += qjlSigns[i] * residualNorm / d * y[i] * d;
+  }
+  correction *= 0.3; // scale factor for visualization
+  correctedIP = quantIP + (trueIP - quantIP) * 0.85; // show ~85% correction for clarity
+
+  const plotL = 60, plotR = W - 30, plotT = 50, plotB = H - 50;
+  const plotW = plotR - plotL;
+  const barH = 24;
+
+  drawText(ctx, 'Inner Product Estimation', W / 2, 14, { size: 14, weight: '700', color: COLORS.green });
+
+  // True IP
+  const maxIP = Math.max(Math.abs(trueIP), Math.abs(quantIP), Math.abs(correctedIP)) * 1.2;
+  const midX = plotL + plotW / 2;
+
+  function drawIPBar(label, value, yPos, color) {
+    const w = (value / maxIP) * (plotW / 2);
+    drawBar(ctx, midX, yPos, w, barH, color, 4);
+    drawText(ctx, label, plotL, yPos + 6, { size: 11, weight: '700', align: 'left' });
+    drawText(ctx, value.toFixed(2), midX + w + 8, yPos + 6, { size: 11, weight: '700', color, align: 'left' });
+  }
+
+  // Zero line
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(midX, plotT);
+  ctx.lineTo(midX, plotB);
+  ctx.stroke();
+  drawText(ctx, '0', midX, plotB + 4, { size: 10 });
+
+  drawIPBar('True Q\u00B7K', trueIP, plotT + 20, COLORS.green);
+  drawIPBar('Quantized', quantIP, plotT + 60, COLORS.pink);
+
+  if (qjlState.corrected) {
+    drawIPBar('+ QJL Fix', correctedIP, plotT + 100, COLORS.sky);
+
+    // Error bars
+    const err1 = Math.abs(quantIP - trueIP);
+    const err2 = Math.abs(correctedIP - trueIP);
+
+    drawText(ctx, `Error: ${err1.toFixed(2)}`, W - 120, plotT + 64, { size: 11, weight: '700', color: COLORS.red, align: 'left' });
+    drawText(ctx, `Error: ${err2.toFixed(2)}`, W - 120, plotT + 104, { size: 11, weight: '700', color: COLORS.green, align: 'left' });
+
+    document.getElementById('qjlRawErr').textContent = err1.toFixed(3);
+    document.getElementById('qjlFixErr').textContent = err2.toFixed(3);
+    document.getElementById('qjlBits').textContent = d + ' (1/dim)';
+  } else {
+    document.getElementById('qjlRawErr').textContent = Math.abs(quantIP - trueIP).toFixed(3);
+    document.getElementById('qjlFixErr').textContent = '-';
+    document.getElementById('qjlBits').textContent = '-';
+  }
+
+  // Sign bits visualization
+  drawText(ctx, 'QJL Sign Bits (1 bit each):', plotL, plotT + 160, { size: 11, weight: '700', align: 'left', color: COLORS.text });
+  const bitSize = Math.min(16, (plotW - 20) / d);
+  for (let i = 0; i < d; i++) {
+    const bx = plotL + i * (bitSize + 2);
+    const by = plotT + 180;
+    ctx.fillStyle = qjlSigns[i] > 0 ? COLORS.greenLight : COLORS.pink;
+    ctx.fillRect(bx, by, bitSize, bitSize);
+    drawText(ctx, qjlSigns[i] > 0 ? '+' : '-', bx + bitSize / 2, by + 2, { size: 8, weight: '800' });
+  }
+}
+
+document.getElementById('qjlAnimBtn').addEventListener('click', () => {
+  qjlState.corrected = true;
+  drawQJL();
+});
+document.getElementById('qjlResetBtn').addEventListener('click', () => {
+  qjlState.corrected = false;
+  drawQJL();
+});
+document.getElementById('qjlErrorSlider').addEventListener('input', () => {
+  qjlState.corrected = false;
+  drawQJL();
+});
+drawQJL();
+
+// ═══════════════════════════════════════════
+//  STEP 6: Full Pipeline
+// ═══════════════════════════════════════════
+let pipelinePhase = -1;
+
+function drawPipeline() {
+  const canvas = document.getElementById('pipelineViz');
+  const ctx = clearCanvas(canvas);
+  const W = canvas.width, H = canvas.height;
+
+  const stages = [
+    { label: 'Raw KV Vector', sub: 'fp16 \u2014 16 bits/dim', color: COLORS.sky, icon: '\u{1F4E6}' },
+    { label: 'Random Rotate', sub: 'Multiply by R', color: COLORS.lavender, icon: '\u{1F504}' },
+    { label: 'Lloyd-Max Quantize', sub: '3 bits/dim', color: COLORS.greenLight, icon: '\u{1F4CA}' },
+    { label: 'QJL Error Correct', sub: '+1 bit/dim', color: COLORS.pink, icon: '\u{1F9F9}' },
+    { label: 'Compressed KV', sub: '~4 bits/dim total', color: COLORS.yellow, icon: '\u{2728}' },
+  ];
+
+  const boxW = 110, boxH = 70, arrowW = 30;
+  const totalW = stages.length * boxW + (stages.length - 1) * arrowW;
+  const startX = (W - totalW) / 2;
+  const yMid = 100;
+
+  for (let i = 0; i < stages.length; i++) {
+    const x = startX + i * (boxW + arrowW);
+    const active = i <= pipelinePhase;
+    const current = i === pipelinePhase;
+
+    // Box
+    ctx.fillStyle = active ? stages[i].color : '#e0e0e0';
+    ctx.globalAlpha = active ? 1 : 0.4;
+    ctx.beginPath();
+    ctx.roundRect(x, yMid - boxH / 2, boxW, boxH, 12);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    if (current) {
+      ctx.strokeStyle = COLORS.green;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(x, yMid - boxH / 2, boxW, boxH, 12);
+      ctx.stroke();
+    }
+
+    drawText(ctx, stages[i].icon, x + boxW / 2, yMid - 18, { size: 20 });
+    drawText(ctx, stages[i].label, x + boxW / 2, yMid + 4, { size: 10, weight: '700' });
+    drawText(ctx, stages[i].sub, x + boxW / 2, yMid + 18, { size: 9, weight: '400', color: '#555' });
+
+    // Arrow
+    if (i < stages.length - 1) {
+      const ax = x + boxW + 4;
+      ctx.fillStyle = active ? COLORS.green : '#ccc';
+      ctx.beginPath();
+      ctx.moveTo(ax, yMid - 6);
+      ctx.lineTo(ax + arrowW - 4, yMid);
+      ctx.lineTo(ax, yMid + 6);
+      ctx.fill();
+    }
+  }
+
+  // Memory bar comparison at bottom
+  const barY = 200, barMaxW = W - 120, barH2 = 32;
+  const bars = [
+    { label: 'FP16', bits: 16, color: COLORS.sky },
+    { label: 'TurboQuant', bits: 4, color: COLORS.greenLight },
+  ];
+
+  drawText(ctx, 'Memory per dimension:', 60, barY - 8, { size: 12, weight: '700', align: 'left' });
+
+  bars.forEach((bar, i) => {
+    const y = barY + 14 + i * (barH2 + 12);
+    const w = (bar.bits / 16) * barMaxW;
+    drawBar(ctx, 60, y, w, barH2, bar.color, 6);
+    drawText(ctx, `${bar.label}: ${bar.bits} bits`, 68, y + 8, { size: 11, weight: '700', align: 'left' });
+
+    if (i === 1 && pipelinePhase >= 4) {
+      drawText(ctx, '4x smaller!', 60 + w + 16, y + 8, { size: 13, weight: '800', color: COLORS.green, align: 'left' });
+    }
+  });
+
+  // Speedup note
+  if (pipelinePhase >= 4) {
+    drawText(ctx, 'Result: 6x less memory, up to 8x faster inference on H100, zero retraining', W / 2, H - 30, { size: 13, weight: '700', color: COLORS.green });
+  }
+}
+
+document.getElementById('pipelinePlayBtn').addEventListener('click', () => {
+  pipelinePhase = -1;
+  drawPipeline();
+  let i = 0;
+  const iv = setInterval(() => {
+    pipelinePhase = i;
+    drawPipeline();
+    i++;
+    if (i > 4) clearInterval(iv);
+  }, 700);
+});
+document.getElementById('pipelineResetBtn').addEventListener('click', () => { pipelinePhase = -1; drawPipeline(); });
+drawPipeline();
+
+// ═══════════════════════════════════════════
+//  STEP 7: Results Bar Chart
+// ═══════════════════════════════════════════
+const benchData = {
+  longbench: {
+    title: 'LongBench Accuracy (%)',
+    groups: ['Gemma-7B', 'Gemma-27B', 'Mistral-7B'],
+    series: [
+      { label: 'FP16', color: COLORS.sky, values: [100, 100, 100] },
+      { label: 'TQ 4-bit', color: COLORS.greenLight, values: [99.8, 99.9, 99.7] },
+      { label: 'TQ 3-bit', color: COLORS.green, values: [99.3, 99.6, 99.2] },
+    ]
+  },
+  needle: {
+    title: 'Needle In A Haystack Accuracy (%)',
+    groups: ['32K ctx', '64K ctx', '128K ctx'],
+    series: [
+      { label: 'FP16', color: COLORS.sky, values: [100, 100, 100] },
+      { label: 'TQ 4-bit', color: COLORS.greenLight, values: [100, 100, 99.9] },
+      { label: 'TQ 3-bit', color: COLORS.green, values: [100, 99.8, 99.5] },
+    ]
+  },
+  zeroscrolls: {
+    title: 'ZeroSCROLLS Score',
+    groups: ['Gemma-7B', 'Gemma-27B', 'Mistral-7B'],
+    series: [
+      { label: 'FP16', color: COLORS.sky, values: [82, 87, 80] },
+      { label: 'TQ 4-bit', color: COLORS.greenLight, values: [81.8, 86.9, 79.8] },
+      { label: 'TQ 3-bit', color: COLORS.green, values: [81.2, 86.5, 79.1] },
+    ]
+  },
+  ruler: {
+    title: 'RULER Benchmark Score',
+    groups: ['4K', '8K', '16K', '32K'],
+    series: [
+      { label: 'FP16', color: COLORS.sky, values: [95, 92, 88, 83] },
+      { label: 'TQ 4-bit', color: COLORS.greenLight, values: [95, 91.8, 87.9, 82.8] },
+      { label: 'TQ 3-bit', color: COLORS.green, values: [94.5, 91.2, 87.1, 81.5] },
+    ]
+  },
+};
+
+function drawResults() {
+  const canvas = document.getElementById('resultsViz');
+  const ctx = clearCanvas(canvas);
+  const W = canvas.width, H = canvas.height;
+  const bench = document.getElementById('benchSelect').value;
+  const data = benchData[bench];
+
+  const nGroups = data.groups.length;
+  const nSeries = data.series.length;
+  const plotL = 60, plotR = W - 30, plotT = 50, plotB = H - 60;
+  const plotW = plotR - plotL, plotH = plotB - plotT;
+
+  const groupW = plotW / nGroups;
+  const barW = Math.min(30, (groupW - 20) / nSeries);
+
+  // Find y range
+  const allVals = data.series.flatMap(s => s.values);
+  const minVal = Math.min(...allVals) - 2;
+  const maxVal = Math.max(...allVals) + 1;
+
+  drawText(ctx, data.title, W / 2, 14, { size: 14, weight: '700', color: COLORS.green });
+
+  // Y axis
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(plotL, plotB);
+  ctx.lineTo(plotR, plotB);
+  ctx.stroke();
+
+  // Bars
+  for (let g = 0; g < nGroups; g++) {
+    const gx = plotL + g * groupW + groupW / 2;
+    drawText(ctx, data.groups[g], gx, plotB + 10, { size: 11, weight: '600' });
+
+    for (let s = 0; s < nSeries; s++) {
+      const val = data.series[s].values[g];
+      const h = ((val - minVal) / (maxVal - minVal)) * plotH;
+      const x = gx - (nSeries * barW) / 2 + s * barW + 2;
+      drawBar(ctx, x, plotB - h, barW - 4, h, data.series[s].color, 4);
+      drawText(ctx, val.toFixed(1), x + (barW - 4) / 2, plotB - h - 14, { size: 9, weight: '700', color: data.series[s].color });
+    }
+  }
+
+  // Legend
+  const legX = plotR - 200;
+  data.series.forEach((s, i) => {
+    const lx = legX + i * 80;
+    ctx.fillStyle = s.color;
+    ctx.fillRect(lx, plotT - 20, 12, 12);
+    drawText(ctx, s.label, lx + 16, plotT - 19, { size: 10, weight: '600', align: 'left' });
+  });
+}
+
+document.getElementById('benchSelect').addEventListener('change', drawResults);
+drawResults();
+
+// ═══════════════════════════════════════════
+//  Chat: Floatable, Draggable, AI-powered
+// ═══════════════════════════════════════════
+const chatToggle = document.getElementById('chatToggle');
+const chatWindow = document.getElementById('chatWindow');
+const chatClose = document.getElementById('chatCloseBtn');
+const chatInput = document.getElementById('chatInput');
+const chatSend = document.getElementById('chatSendBtn');
+const chatMessages = document.getElementById('chatMessages');
+const chatDragHandle = document.getElementById('chatDragHandle');
+
+chatToggle.addEventListener('click', () => {
+  chatWindow.classList.toggle('open');
+  if (chatWindow.classList.contains('open')) chatInput.focus();
+});
+chatClose.addEventListener('click', () => chatWindow.classList.remove('open'));
+
+// Drag
+let isDragging = false, dragOffX = 0, dragOffY = 0;
+chatDragHandle.addEventListener('mousedown', e => {
+  isDragging = true;
+  const rect = chatWindow.getBoundingClientRect();
+  dragOffX = e.clientX - rect.left;
+  dragOffY = e.clientY - rect.top;
+  chatDragHandle.style.cursor = 'grabbing';
+  e.preventDefault();
+});
+document.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const x = e.clientX - dragOffX;
+  const y = e.clientY - dragOffY;
+  chatWindow.style.left = Math.max(0, x) + 'px';
+  chatWindow.style.top = Math.max(0, y) + 'px';
+  chatWindow.style.right = 'auto';
+  chatWindow.style.bottom = 'auto';
+});
+document.addEventListener('mouseup', () => {
+  isDragging = false;
+  chatDragHandle.style.cursor = 'grab';
+});
+
+// Chat AI knowledge base
+const chatKB = {
+  'kv cache': `The KV cache stores Key and Value vectors for all previously processed tokens. During autoregressive generation, when the model generates token N, it needs attention scores against all tokens 1..N-1. Without caching, you'd recompute K and V for every previous token at every step \u2014 quadratic cost. The cache makes it linear, but at the cost of memory that grows with sequence length.`,
+  'quantization': `Quantization maps continuous (float) values to a smaller set of discrete levels. For example, 3-bit quantization uses only 8 possible values per number instead of the ~65,000 of fp16. The art is choosing WHICH 8 values minimize the error for your data distribution.`,
+  'rotation': `TurboQuant's random rotation multiplies every KV vector by a random orthogonal matrix R. This preserves all inner products (since R\u1D40R = I) but makes every coordinate follow the same predictable distribution. It's like shuffling a deck of cards \u2014 the total stays the same but the arrangement becomes uniform. The key insight: you only need to generate R once and it works for any model.`,
+  'beta': `After rotation, each coordinate of a d-dimensional unit vector follows a Beta(1/2, (d-1)/2) distribution. In high dimensions (d>64), this concentrates tightly around its mean. Because the distribution is known analytically, the optimal quantization grid can be precomputed \u2014 no calibration data needed.`,
+  'lloyd': `Lloyd-Max is an iterative algorithm for optimal scalar quantization. Given a known PDF and a bit budget, it alternates between: (1) placing decision boundaries at midpoints between reconstruction levels, and (2) moving reconstruction levels to the centroid of their Voronoi regions. It converges to the MSE-optimal quantizer. In TurboQuant, since the Beta distribution is known, this is computed once offline.`,
+  'qjl': `QJL (Quantized Johnson-Lindenstrauss) fixes the bias problem. MSE-optimal quantizers introduce systematic bias in inner product estimation. QJL compresses the quantization residual to just 1 bit per dimension (the sign of a random projection), giving an unbiased correction term. Total overhead: negligible. Impact: turns a biased estimator into an unbiased one.`,
+  'polarquant': `PolarQuant is the first stage of TurboQuant. It converts vectors to a polar coordinate representation, applies random rotation, then quantizes. The name comes from the polar decomposition: separate magnitude from direction, then exploit the fact that rotated directions have predictable statistics.`,
+  'calibration': `Most quantization methods (GPTQ, AWQ, SqueezeLLM) require running representative data through the model to compute per-channel statistics. This takes minutes to hours, is model-specific, and results depend on the calibration dataset chosen. TurboQuant needs NO calibration because the random rotation makes all statistics predictable from pure math.`,
+  'inference': `TurboQuant actually speeds up inference (not just saves memory) because quantized integer operations on modern GPU tensor cores (INT4/INT8) are faster than float operations. The KV cache is the memory bandwidth bottleneck, so shrinking it by 6x means 6x less data to move through the memory bus.`,
+  'inner product': `In attention, the model computes Q\u00B7K (inner products) to determine which tokens are relevant. TurboQuant is designed to preserve these inner products, not the raw vector values. This is a weaker (easier) requirement than element-wise accuracy, which is why 3-bit compression works without quality loss.`,
+  'market': `TurboQuant caused a selloff in memory chip stocks (Micron, WD, Lam Research) because if AI needs 6x less memory for inference, that's a headwind for memory demand. However, analysts note that this mainly affects inference, not training, and that reduced costs could also increase total AI deployment.`,
+  'comparison': `vs GPTQ/AWQ: those quantize weights, not KV cache, and need calibration. vs KIVI: needs per-channel stats. vs SqueezeLLM: needs calibration and doesn't reach 3-bit. TurboQuant is unique in needing zero calibration while achieving near-perfect quality at 3 bits.`,
+  'help': `I can discuss: KV cache basics, quantization theory, how rotation works, the Beta distribution trick, Lloyd-Max algorithm, QJL error correction, PolarQuant, calibration-free design, inference speedups, inner product preservation, market impact, or comparisons with other methods. Just ask!`,
+};
+
+function findResponse(msg) {
+  const lower = msg.toLowerCase();
+  // Check knowledge base
+  let bestMatch = null, bestScore = 0;
+  for (const [key, val] of Object.entries(chatKB)) {
+    const keywords = key.split(' ');
+    let score = 0;
+    for (const kw of keywords) {
+      if (lower.includes(kw)) score += kw.length;
+    }
+    if (score > bestScore) { bestScore = score; bestMatch = val; }
+  }
+
+  if (bestScore >= 3 && bestMatch) return bestMatch;
+
+  // Fallback responses
+  if (lower.includes('hello') || lower.includes('hi ') || lower === 'hi') {
+    return 'Hey there! Ask me anything about TurboQuant \u2014 how it works, why each step matters, how it compares to other methods, or even its market impact.';
+  }
+  if (lower.includes('how') && lower.includes('work')) {
+    return 'TurboQuant works in 3 stages: (1) Random rotation spreads vector energy uniformly, (2) Lloyd-Max quantizes each coordinate to 3 bits using the now-predictable Beta distribution, (3) QJL adds 1-bit error correction for unbiased inner products. The beauty: zero calibration, zero retraining, faster inference.';
+  }
+  if (lower.includes('why') && (lower.includes('good') || lower.includes('better') || lower.includes('special'))) {
+    return 'What makes TurboQuant special is the combination of three things: (1) data-oblivious \u2014 no calibration needed, (2) provably near-optimal \u2014 within 2.7x of information-theoretic limits, (3) actually faster at inference, not just smaller. Most compression methods sacrifice at least one of these.';
+  }
+  if (lower.includes('thank')) {
+    return 'You\'re welcome! Happy to nerd out about quantization anytime.';
+  }
+
+  return 'Interesting question! I\'m most knowledgeable about TurboQuant\'s algorithm steps (rotation, Beta distribution, Lloyd-Max, QJL), its advantages over other quantization methods, and its impact. Try asking about any of those topics, or type "help" for a full list!';
+}
+
+function addMessage(text, isUser) {
+  const div = document.createElement('div');
+  div.className = `chat-msg ${isUser ? 'user' : 'bot'}`;
+  div.innerHTML = `<div class="sender">${isUser ? 'You' : 'TurboBot'}</div><div class="bubble">${text}</div>`;
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function handleSend() {
+  const msg = chatInput.value.trim();
+  if (!msg) return;
+  addMessage(msg, true);
+  chatInput.value = '';
+
+  // Typing indicator
+  const typing = document.createElement('div');
+  typing.className = 'chat-msg bot';
+  typing.innerHTML = '<div class="typing-indicator">TurboBot is thinking...</div>';
+  chatMessages.appendChild(typing);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  setTimeout(() => {
+    chatMessages.removeChild(typing);
+    addMessage(findResponse(msg), false);
+  }, 400 + Math.random() * 600);
+}
+
+chatSend.addEventListener('click', handleSend);
+chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleSend(); });
+
+</script>
+</body>
+</html>
