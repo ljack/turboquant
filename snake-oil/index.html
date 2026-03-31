@@ -451,6 +451,73 @@ code {
 }
 .footer a { color: var(--green-mid); }
 
+/* ─── Text selection tooltip ─── */
+.ask-tooltip {
+  display: none;
+  position: absolute;
+  z-index: 1001;
+  background: linear-gradient(135deg, var(--green-mid), var(--green-light));
+  color: white;
+  padding: 7px 14px;
+  border-radius: 20px;
+  font-size: 0.82em;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,.2);
+  white-space: nowrap;
+  user-select: none;
+  animation: tooltipPop 0.2s ease;
+  pointer-events: auto;
+}
+.ask-tooltip:hover { filter: brightness(1.1); }
+.ask-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--green-mid);
+}
+@keyframes tooltipPop {
+  from { opacity: 0; transform: scale(0.85) translateY(4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.chat-input-row .selection-badge {
+  display: none;
+  background: var(--green-bg);
+  border: 1px solid var(--green-pale);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin: 0;
+  font-size: 0.8em;
+  color: var(--text-mid);
+  max-height: 48px;
+  overflow: hidden;
+  position: relative;
+  line-height: 1.3;
+}
+.chat-input-row .selection-badge.visible { display: block; }
+.chat-input-row .selection-badge .sel-label {
+  font-weight: 700;
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--green-mid);
+}
+.chat-input-row .selection-badge .sel-clear {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  background: none;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 3px;
+}
+.chat-input-row .selection-badge .sel-clear:hover { color: var(--text); }
+
 /* ─── Responsive ─── */
 @media (max-width: 500px) {
   .header h1 { font-size: 2em; }
@@ -810,11 +877,19 @@ code {
       <div class="bubble">Hey! I'm here to discuss TurboQuant, quantization, KV caches, or anything ML-related. What's on your mind?</div>
     </div>
   </div>
+  <div class="selection-badge" id="selBadge">
+    <span class="sel-label">Selected text:</span>
+    <button class="sel-clear" id="selClear" title="Clear selection">&times;</button>
+    <div id="selText"></div>
+  </div>
   <div class="chat-input-row">
     <input type="text" id="chatInput" placeholder="Ask about TurboQuant..." autocomplete="off">
     <button id="chatSendBtn">Send</button>
   </div>
 </div>
+
+<!-- Selection tooltip -->
+<div class="ask-tooltip" id="askTooltip">Ask TurboBot about this</div>
 
 <div class="footer">
   Built for exploration &bull; Based on <a href="https://arxiv.org/abs/2504.19874" target="_blank">TurboQuant (ICLR 2026)</a> by Google Research
@@ -1758,6 +1833,13 @@ const chatInput = document.getElementById('chatInput');
 const chatSend = document.getElementById('chatSendBtn');
 const chatMessages = document.getElementById('chatMessages');
 const chatDragHandle = document.getElementById('chatDragHandle');
+const askTooltip = document.getElementById('askTooltip');
+const selBadge = document.getElementById('selBadge');
+const selTextEl = document.getElementById('selText');
+const selClear = document.getElementById('selClear');
+
+let pendingSelection = '';
+let chatHistory = [];
 
 chatToggle.addEventListener('click', () => {
   chatWindow.classList.toggle('open');
@@ -1765,7 +1847,7 @@ chatToggle.addEventListener('click', () => {
 });
 chatClose.addEventListener('click', () => chatWindow.classList.remove('open'));
 
-// Drag
+// ── Drag ──
 let isDragging = false, dragOffX = 0, dragOffY = 0;
 chatDragHandle.addEventListener('mousedown', e => {
   isDragging = true;
@@ -1789,26 +1871,93 @@ document.addEventListener('mouseup', () => {
   chatDragHandle.style.cursor = 'grab';
 });
 
-// Chat AI knowledge base
+// ── Text selection → tooltip ──
+let tooltipTimeout = null;
+document.addEventListener('mouseup', e => {
+  if (e.target.closest('.chat-window') || e.target.closest('.ask-tooltip')) return;
+  clearTimeout(tooltipTimeout);
+  tooltipTimeout = setTimeout(() => {
+    const sel = window.getSelection();
+    const text = sel?.toString().trim();
+    if (text && text.length > 3 && text.length < 500) {
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      askTooltip.style.display = 'block';
+      askTooltip.style.left = (rect.left + rect.width / 2 - askTooltip.offsetWidth / 2 + window.scrollX) + 'px';
+      askTooltip.style.top = (rect.top - 44 + window.scrollY) + 'px';
+      askTooltip._selectedText = text;
+    } else {
+      askTooltip.style.display = 'none';
+    }
+  }, 200);
+});
+
+document.addEventListener('mousedown', e => {
+  if (!e.target.closest('.ask-tooltip')) {
+    askTooltip.style.display = 'none';
+  }
+});
+
+askTooltip.addEventListener('click', () => {
+  const text = askTooltip._selectedText;
+  if (!text) return;
+  askTooltip.style.display = 'none';
+  window.getSelection().removeAllRanges();
+
+  // Set pending selection and open chat
+  pendingSelection = text;
+  selTextEl.textContent = text.length > 80 ? text.slice(0, 80) + '...' : text;
+  selBadge.classList.add('visible');
+  chatWindow.classList.add('open');
+  chatInput.placeholder = 'Ask about the selected text...';
+  chatInput.focus();
+});
+
+selClear.addEventListener('click', () => {
+  pendingSelection = '';
+  selBadge.classList.remove('visible');
+  chatInput.placeholder = 'Ask about TurboQuant...';
+});
+
+// ── AI Chat (Groq free API with fallback to static KB) ──
+const SYSTEM_PROMPT = `You are TurboBot, an expert assistant embedded in an interactive TurboQuant explainer page. TurboQuant is Google's ICLR 2026 algorithm for KV cache compression in LLMs.
+
+Key facts you know deeply:
+- TurboQuant compresses the KV cache to 3-4 bits with zero accuracy loss and no retraining
+- Stage 1 (PolarQuant): Random orthogonal rotation spreads vector energy uniformly. Preserves inner products since R^T R = I. Data-oblivious — same R works for any model.
+- After rotation, each coordinate follows Beta(1/2, (d-1)/2). In high dimensions this concentrates tightly, making the distribution predictable without calibration.
+- Lloyd-Max algorithm precomputes optimal quantization levels for the known Beta distribution. Zero runtime cost — it's a lookup table.
+- Stage 2 (QJL): 1-bit error correction. MSE-optimal quantizers bias inner products. QJL stores sign of random projection of residual → unbiased estimator. Only 1 bit overhead per dimension.
+- Results: 6x KV memory reduction, up to 8x speedup on H100, works on Gemma & Mistral, tested on LongBench, NIAH, ZeroSCROLLS, RULER.
+- At 1M token contexts, a 70B model needs ~1.3 TB KV cache in FP16. TurboQuant brings this to ~220 GB.
+- Compared to GPTQ/AWQ (need calibration, quantize weights not KV), KIVI (per-channel stats), SqueezeLLM (calibration needed).
+- Near-optimal: within 2.7x of information-theoretic lower bound.
+- Caused memory chip stock selloffs (Micron, WD, Lam Research).
+
+Be concise but insightful. When the user selects text from the page, explain it clearly. Adapt depth to the question — brief for simple questions, detailed for technical ones. You can discuss any ML/AI topic, not just TurboQuant.`;
+
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+let groqApiKey = localStorage.getItem('turboquant_groq_key') || '';
+
+// Static fallback KB
 const chatKB = {
-  'kv cache': `The KV cache stores Key and Value vectors for all previously processed tokens. During autoregressive generation, when the model generates token N, it needs attention scores against all tokens 1..N-1. Without caching, you'd recompute K and V for every previous token at every step \u2014 quadratic cost. The cache makes it linear, but at the cost of memory that grows with sequence length. At 1M token contexts, a 70B model needs over 1 TB of KV cache in FP16 \u2014 that's where TurboQuant's 6x compression becomes not just nice-to-have but essential.`,
-  'quantization': `Quantization maps continuous (float) values to a smaller set of discrete levels. For example, 3-bit quantization uses only 8 possible values per number instead of the ~65,000 of fp16. The art is choosing WHICH 8 values minimize the error for your data distribution.`,
-  'rotation': `TurboQuant's random rotation multiplies every KV vector by a random orthogonal matrix R. This preserves all inner products (since R\u1D40R = I) but makes every coordinate follow the same predictable distribution. It's like shuffling a deck of cards \u2014 the total stays the same but the arrangement becomes uniform. The key insight: you only need to generate R once and it works for any model.`,
-  'beta': `After rotation, each coordinate of a d-dimensional unit vector follows a Beta(1/2, (d-1)/2) distribution. In high dimensions (d>64), this concentrates tightly around its mean. Because the distribution is known analytically, the optimal quantization grid can be precomputed \u2014 no calibration data needed.`,
-  'lloyd': `Lloyd-Max is an iterative algorithm for optimal scalar quantization. Given a known PDF and a bit budget, it alternates between: (1) placing decision boundaries at midpoints between reconstruction levels, and (2) moving reconstruction levels to the centroid of their Voronoi regions. It converges to the MSE-optimal quantizer. In TurboQuant, since the Beta distribution is known, this is computed once offline.`,
-  'qjl': `QJL (Quantized Johnson-Lindenstrauss) fixes the bias problem. MSE-optimal quantizers introduce systematic bias in inner product estimation. QJL compresses the quantization residual to just 1 bit per dimension (the sign of a random projection), giving an unbiased correction term. Total overhead: negligible. Impact: turns a biased estimator into an unbiased one.`,
-  'polarquant': `PolarQuant is the first stage of TurboQuant. It converts vectors to a polar coordinate representation, applies random rotation, then quantizes. The name comes from the polar decomposition: separate magnitude from direction, then exploit the fact that rotated directions have predictable statistics.`,
-  'calibration': `Most quantization methods (GPTQ, AWQ, SqueezeLLM) require running representative data through the model to compute per-channel statistics. This takes minutes to hours, is model-specific, and results depend on the calibration dataset chosen. TurboQuant needs NO calibration because the random rotation makes all statistics predictable from pure math.`,
-  'inference': `TurboQuant actually speeds up inference (not just saves memory) because quantized integer operations on modern GPU tensor cores (INT4/INT8) are faster than float operations. The KV cache is the memory bandwidth bottleneck, so shrinking it by 6x means 6x less data to move through the memory bus. This is especially dramatic at 1M token contexts where the KV cache dominates total memory \u2014 TurboQuant can make the difference between "needs a full server rack" and "fits on a single 8xH100 node."`,
-  'inner product': `In attention, the model computes Q\u00B7K (inner products) to determine which tokens are relevant. TurboQuant is designed to preserve these inner products, not the raw vector values. This is a weaker (easier) requirement than element-wise accuracy, which is why 3-bit compression works without quality loss.`,
-  'market': `TurboQuant caused a selloff in memory chip stocks (Micron, WD, Lam Research) because if AI needs 6x less memory for inference, that's a headwind for memory demand. However, analysts note that this mainly affects inference, not training, and that reduced costs could also increase total AI deployment.`,
-  'comparison': `vs GPTQ/AWQ: those quantize weights, not KV cache, and need calibration. vs KIVI: needs per-channel stats. vs SqueezeLLM: needs calibration and doesn't reach 3-bit. TurboQuant is unique in needing zero calibration while achieving near-perfect quality at 3 bits.`,
-  'help': `I can discuss: KV cache basics, quantization theory, how rotation works, the Beta distribution trick, Lloyd-Max algorithm, QJL error correction, PolarQuant, calibration-free design, inference speedups, inner product preservation, market impact, or comparisons with other methods. Just ask!`,
+  'kv cache': 'The KV cache stores Key and Value vectors for all previously processed tokens. During autoregressive generation, when the model generates token N, it needs attention scores against all tokens 1..N-1. Without caching, you\'d recompute K and V for every previous token at every step \u2014 quadratic cost. The cache makes it linear, but at the cost of memory that grows with sequence length. At 1M token contexts, a 70B model needs over 1 TB of KV cache in FP16 \u2014 that\'s where TurboQuant\'s 6x compression becomes essential.',
+  'quantization': 'Quantization maps continuous (float) values to a smaller set of discrete levels. For example, 3-bit quantization uses only 8 possible values per number instead of the ~65,000 of fp16. The art is choosing WHICH 8 values minimize the error for your data distribution.',
+  'rotation': 'TurboQuant\'s random rotation multiplies every KV vector by a random orthogonal matrix R. This preserves all inner products (since R\u1D40R = I) but makes every coordinate follow the same predictable distribution. You only need to generate R once and it works for any model.',
+  'beta': 'After rotation, each coordinate of a d-dimensional unit vector follows a Beta(1/2, (d-1)/2) distribution. In high dimensions (d>64), this concentrates tightly around its mean. The optimal quantization grid can be precomputed \u2014 no calibration data needed.',
+  'lloyd': 'Lloyd-Max is an iterative algorithm for optimal scalar quantization. Given a known PDF and a bit budget, it alternates between: placing decision boundaries at midpoints between reconstruction levels, and moving levels to the centroid of their Voronoi regions. It converges to the MSE-optimal quantizer.',
+  'qjl': 'QJL (Quantized Johnson-Lindenstrauss) fixes the bias problem. MSE-optimal quantizers introduce systematic bias in inner product estimation. QJL compresses the residual to just 1 bit per dimension (the sign of a random projection), giving an unbiased correction. Total overhead: negligible.',
+  'polarquant': 'PolarQuant is the first stage of TurboQuant. It applies random rotation then quantizes. The name comes from the polar decomposition: separate magnitude from direction, then exploit that rotated directions have predictable statistics.',
+  'calibration': 'Most methods (GPTQ, AWQ, SqueezeLLM) need calibration data. TurboQuant needs NONE because the random rotation makes statistics predictable from pure math.',
+  'inference': 'TurboQuant speeds up inference because quantized integer ops on modern GPU tensor cores (INT4/INT8) are faster than float ops. At 1M tokens, TurboQuant can mean the difference between a full server rack and a single 8xH100 node.',
+  'inner product': 'Attention computes Q\u00B7K to determine which tokens are relevant. TurboQuant preserves inner products, not raw values. This weaker requirement is why 3-bit compression works.',
+  'market': 'TurboQuant caused memory chip stock selloffs (Micron, WD, Lam Research) because 6x less inference memory means reduced HBM demand. But reduced costs could also increase total AI deployment.',
+  'comparison': 'vs GPTQ/AWQ: those quantize weights, not KV cache, and need calibration. vs KIVI: needs per-channel stats. TurboQuant is unique in needing zero calibration while achieving near-perfect quality at 3 bits.',
+  'help': 'I can discuss: KV cache, quantization, rotation, Beta distribution, Lloyd-Max, QJL, PolarQuant, calibration, inference speedups, inner products, market impact, comparisons, and more. For richer answers, add a Groq API key (free) via the \u2699\uFE0F button!',
 };
 
-function findResponse(msg) {
+function findStaticResponse(msg) {
   const lower = msg.toLowerCase();
-  // Check knowledge base
   let bestMatch = null, bestScore = 0;
   for (const [key, val] of Object.entries(chatKB)) {
     const keywords = key.split(' ');
@@ -1818,39 +1967,111 @@ function findResponse(msg) {
     }
     if (score > bestScore) { bestScore = score; bestMatch = val; }
   }
-
   if (bestScore >= 3 && bestMatch) return bestMatch;
-
-  // Fallback responses
-  if (lower.includes('hello') || lower.includes('hi ') || lower === 'hi') {
-    return 'Hey there! Ask me anything about TurboQuant \u2014 how it works, why each step matters, how it compares to other methods, or even its market impact.';
-  }
-  if (lower.includes('how') && lower.includes('work')) {
-    return 'TurboQuant works in 3 stages: (1) Random rotation spreads vector energy uniformly, (2) Lloyd-Max quantizes each coordinate to 3 bits using the now-predictable Beta distribution, (3) QJL adds 1-bit error correction for unbiased inner products. The beauty: zero calibration, zero retraining, faster inference.';
-  }
-  if (lower.includes('why') && (lower.includes('good') || lower.includes('better') || lower.includes('special'))) {
-    return 'What makes TurboQuant special is the combination of three things: (1) data-oblivious \u2014 no calibration needed, (2) provably near-optimal \u2014 within 2.7x of information-theoretic limits, (3) actually faster at inference, not just smaller. Most compression methods sacrifice at least one of these.';
-  }
-  if (lower.includes('thank')) {
+  if (lower.includes('hello') || lower.includes('hi ') || lower === 'hi')
+    return 'Hey there! Ask me anything about TurboQuant. For AI-powered answers, add a free Groq API key via the \u2699\uFE0F button in the chat header!';
+  if (lower.includes('how') && lower.includes('work'))
+    return 'TurboQuant: (1) Random rotation \u2192 uniform coordinates, (2) Lloyd-Max quantizes to 3 bits using predictable Beta distribution, (3) QJL adds 1-bit unbiased error correction. Zero calibration, zero retraining, faster inference.';
+  if (lower.includes('thank'))
     return 'You\'re welcome! Happy to nerd out about quantization anytime.';
+  return 'I can answer questions about TurboQuant\'s algorithm, KV caches, quantization, and more. For deeper AI-powered conversations, add a free Groq API key via the \u2699\uFE0F button!';
+}
+
+async function getAIResponse(userMsg, selectedText) {
+  // Build messages
+  const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+
+  // Add chat history (last 10 messages)
+  for (const m of chatHistory.slice(-10)) {
+    messages.push(m);
   }
 
-  return 'Interesting question! I\'m most knowledgeable about TurboQuant\'s algorithm steps (rotation, Beta distribution, Lloyd-Max, QJL), its advantages over other quantization methods, and its impact. Try asking about any of those topics, or type "help" for a full list!';
+  // Build user message with selection context
+  let fullMsg = userMsg;
+  if (selectedText) {
+    fullMsg = `The user selected this text from the page:\n"${selectedText}"\n\nTheir question: ${userMsg}`;
+  }
+  messages.push({ role: 'user', content: fullMsg });
+
+  if (!groqApiKey) {
+    // Fallback to static
+    const response = findStaticResponse((selectedText || '') + ' ' + userMsg);
+    chatHistory.push({ role: 'user', content: fullMsg });
+    chatHistory.push({ role: 'assistant', content: response });
+    return response;
+  }
+
+  try {
+    const res = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${groqApiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages,
+        max_tokens: 512,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      if (res.status === 401) return 'API key invalid. Please update it via the \u2699\uFE0F button.';
+      throw new Error(err);
+    }
+
+    const data = await res.json();
+    const reply = data.choices?.[0]?.message?.content || 'No response received.';
+    chatHistory.push({ role: 'user', content: fullMsg });
+    chatHistory.push({ role: 'assistant', content: reply });
+    return reply;
+  } catch (e) {
+    console.error('Groq API error:', e);
+    // Fallback to static
+    const response = findStaticResponse((selectedText || '') + ' ' + userMsg);
+    chatHistory.push({ role: 'user', content: fullMsg });
+    chatHistory.push({ role: 'assistant', content: response });
+    return response + '\n\n(AI unavailable \u2014 using built-in knowledge base)';
+  }
 }
 
 function addMessage(text, isUser) {
   const div = document.createElement('div');
   div.className = `chat-msg ${isUser ? 'user' : 'bot'}`;
-  div.innerHTML = `<div class="sender">${isUser ? 'You' : 'TurboBot'}</div><div class="bubble">${text}</div>`;
+  // Simple markdown-ish formatting for bot messages
+  let html = text;
+  if (!isUser) {
+    html = text
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`(.+?)`/g, '<code>$1</code>')
+      .replace(/\n/g, '<br>');
+  } else {
+    html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  div.innerHTML = `<div class="sender">${isUser ? 'You' : 'TurboBot'}</div><div class="bubble">${html}</div>`;
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-function handleSend() {
+async function handleSend() {
   const msg = chatInput.value.trim();
   if (!msg) return;
-  addMessage(msg, true);
+
+  const selectedCtx = pendingSelection;
+  const displayMsg = selectedCtx
+    ? `[Re: "${selectedCtx.length > 40 ? selectedCtx.slice(0, 40) + '...' : selectedCtx}"] ${msg}`
+    : msg;
+  addMessage(displayMsg, true);
   chatInput.value = '';
+
+  // Clear selection
+  pendingSelection = '';
+  selBadge.classList.remove('visible');
+  chatInput.placeholder = 'Ask about TurboQuant...';
 
   // Typing indicator
   const typing = document.createElement('div');
@@ -1859,14 +2080,39 @@ function handleSend() {
   chatMessages.appendChild(typing);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 
-  setTimeout(() => {
-    chatMessages.removeChild(typing);
-    addMessage(findResponse(msg), false);
-  }, 400 + Math.random() * 600);
+  const reply = await getAIResponse(msg, selectedCtx);
+  chatMessages.removeChild(typing);
+  addMessage(reply, false);
 }
 
 chatSend.addEventListener('click', handleSend);
 chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleSend(); });
+
+// ── API key settings button ──
+const settingsBtn = document.createElement('button');
+settingsBtn.className = 'chat-close';
+settingsBtn.title = 'Set Groq API key for AI-powered chat';
+settingsBtn.textContent = '\u2699\uFE0F';
+settingsBtn.style.marginRight = '4px';
+settingsBtn.style.fontSize = '16px';
+chatDragHandle.insertBefore(settingsBtn, chatClose);
+
+settingsBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  const current = groqApiKey ? '(key is set)' : '(no key)';
+  const key = prompt(
+    `Enter your free Groq API key for AI-powered chat.\n\nGet one free at: https://console.groq.com/keys\n\nCurrent: ${current}\n\nLeave empty to clear and use built-in knowledge base.`
+  );
+  if (key === null) return; // cancelled
+  groqApiKey = key.trim();
+  if (groqApiKey) {
+    localStorage.setItem('turboquant_groq_key', groqApiKey);
+    addMessage('Groq API key set! I\'m now powered by Llama 3.3 70B. Ask me anything!', false);
+  } else {
+    localStorage.removeItem('turboquant_groq_key');
+    addMessage('API key cleared. Using built-in knowledge base.', false);
+  }
+});
 
 </script>
 </body>
