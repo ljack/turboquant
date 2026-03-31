@@ -1205,6 +1205,13 @@ function startKVAnimation() {
   if (kvAnimId) { clearInterval(kvAnimId); kvAnimId = null; }
   kvAnimPhase = 0;
   const totalPhases = nTokens + 3; // scan each key + show scores + pull values + hold
+  const btn = document.getElementById('kvAnimBtn');
+  btn.textContent = 'Animating...';
+  btn.style.background = COLORS.green;
+  btn.style.color = '#fff';
+
+  drawKVCache(kvAnimPhase); // draw first frame immediately
+  kvAnimPhase++;
 
   kvAnimId = setInterval(() => {
     drawKVCache(kvAnimPhase);
@@ -1212,10 +1219,13 @@ function startKVAnimation() {
     if (kvAnimPhase >= totalPhases) {
       clearInterval(kvAnimId);
       kvAnimId = null;
-      // Hold final frame for 2s then reset
-      setTimeout(() => { if (!kvAnimId) drawKVCache(); }, 2500);
+      btn.textContent = 'Animate Attention Step';
+      btn.style.background = '';
+      btn.style.color = '';
+      // Hold final frame for 3s then reset
+      setTimeout(() => { if (!kvAnimId) drawKVCache(); }, 3000);
     }
-  }, 250);
+  }, 400);
 }
 
 document.getElementById('tokenSlider').addEventListener('input', () => {
