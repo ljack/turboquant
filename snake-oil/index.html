@@ -2660,7 +2660,7 @@ function findStaticResponse(msg) {
   return 'I can answer questions about TurboQuant\'s algorithm, KV caches, quantization, and more. Try asking about a specific topic!';
 }
 
-async function getAIResponse(userMsg, selectedText) {
+function buildMessages(userMsg, selectedText) {
   // Build messages
   const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
 
@@ -2675,35 +2675,10 @@ async function getAIResponse(userMsg, selectedText) {
     fullMsg = `The user selected this text from the page:\n"${selectedText}"\n\nTheir question: ${userMsg}`;
   }
   messages.push({ role: 'user', content: fullMsg });
-
-  try {
-    const res = await fetch(WORKER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      if (res.status === 429) return data.error || 'Rate limited. Try again in a few minutes.';
-      throw new Error(data.error || 'API error');
-    }
-
-    const reply = data.choices?.[0]?.message?.content || 'No response received.';
-    chatHistory.push({ role: 'user', content: fullMsg });
-    chatHistory.push({ role: 'assistant', content: reply });
-    return reply;
-  } catch (e) {
-    console.error('Chat API error:', e);
-    // Fallback to static KB
-    const response = findStaticResponse((selectedText || '') + ' ' + userMsg);
-    chatHistory.push({ role: 'user', content: fullMsg });
-    chatHistory.push({ role: 'assistant', content: response });
-    return response + '\n\n(AI unavailable \u2014 using built-in knowledge base)';
-  }
+  return { messages, fullMsg };
 }
 
+// Render a complete bot message (for static fallback or re-render)
 function addMessage(text, isUser) {
   const div = document.createElement('div');
   div.className = `chat-msg ${isUser ? 'user' : 'bot'}`;
@@ -2719,22 +2694,106 @@ function addMessage(text, isUser) {
   if (isUser) {
     bubble.textContent = text;
   } else {
-    // Parse viz blocks and markdown
-    const parts = extractVizBlocks(text);
-    for (const part of parts) {
-      if (part.type === 'text') {
-        const span = document.createElement('span');
-        span.innerHTML = renderMarkdown(part.content.trim());
-        bubble.appendChild(span);
-      } else {
-        bubble.appendChild(createVizElement(part.type, part.data));
-      }
-    }
+    renderBotBubble(bubble, text);
   }
 
   div.appendChild(bubble);
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
+  return div;
+}
+
+function renderBotBubble(bubble, text) {
+  bubble.innerHTML = '';
+  const parts = extractVizBlocks(text);
+  for (const part of parts) {
+    if (part.type === 'text') {
+      const span = document.createElement('span');
+      span.innerHTML = renderMarkdown(part.content.trim());
+      bubble.appendChild(span);
+    } else {
+      bubble.appendChild(createVizElement(part.type, part.data));
+    }
+  }
+}
+
+// Create an empty bot message div for streaming into
+function createStreamingMessage() {
+  const div = document.createElement('div');
+  div.className = 'chat-msg bot';
+
+  const senderEl = document.createElement('div');
+  senderEl.className = 'sender';
+  senderEl.textContent = 'TurboBot';
+  div.appendChild(senderEl);
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  div.appendChild(bubble);
+
+  chatMessages.appendChild(div);
+  return { div, bubble };
+}
+
+// Stream response from worker SSE endpoint
+async function streamResponse(messages, bubble) {
+  const res = await fetch(WORKER_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages, stream: true }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'API error');
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let fullText = '';
+  let buffer = '';
+  let lastRender = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    // Parse SSE lines
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || ''; // keep incomplete line
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(data);
+          const delta = parsed.choices?.[0]?.delta?.content;
+          if (delta) {
+            fullText += delta;
+            // Throttle re-renders to every 80ms
+            const now = Date.now();
+            if (now - lastRender > 80) {
+              // During streaming, render plain markdown (no viz blocks yet)
+              bubble.innerHTML = renderMarkdown(fullText);
+              chatMessages.scrollTop = chatMessages.scrollHeight;
+              lastRender = now;
+            }
+          }
+        } catch { /* skip malformed chunks */ }
+      }
+    }
+  }
+
+  // Final render with viz blocks
+  if (fullText) {
+    renderBotBubble(bubble, fullText);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  return fullText;
 }
 
 async function handleSend() {
@@ -2753,16 +2812,27 @@ async function handleSend() {
   selBadge.classList.remove('visible');
   chatInput.placeholder = 'Ask about TurboQuant...';
 
-  // Typing indicator
-  const typing = document.createElement('div');
-  typing.className = 'chat-msg bot';
-  typing.innerHTML = '<div class="typing-indicator">TurboBot is thinking...</div>';
-  chatMessages.appendChild(typing);
+  // Build messages
+  const { messages, fullMsg } = buildMessages(msg, selectedCtx);
+
+  // Create streaming bot message
+  const { div: botDiv, bubble } = createStreamingMessage();
+  bubble.innerHTML = '<span class="typing-indicator">TurboBot is thinking...</span>';
   chatMessages.scrollTop = chatMessages.scrollHeight;
 
-  const reply = await getAIResponse(msg, selectedCtx);
-  chatMessages.removeChild(typing);
-  addMessage(reply, false);
+  try {
+    const reply = await streamResponse(messages, bubble);
+    if (!reply || reply.length < 2) throw new Error('Empty response');
+    chatHistory.push({ role: 'user', content: fullMsg });
+    chatHistory.push({ role: 'assistant', content: reply });
+  } catch (e) {
+    console.error('Chat API error:', e);
+    // Fallback to static KB
+    const response = findStaticResponse((selectedCtx || '') + ' ' + msg);
+    chatHistory.push({ role: 'user', content: fullMsg });
+    chatHistory.push({ role: 'assistant', content: response });
+    renderBotBubble(bubble, response + '\n\n(AI unavailable \u2014 using built-in knowledge base)');
+  }
 }
 
 chatSend.addEventListener('click', handleSend);
