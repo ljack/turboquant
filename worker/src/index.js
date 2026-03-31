@@ -50,37 +50,55 @@ export default {
     // Cap message count and token usage
     const trimmed = messages.slice(-12);
 
-    // Proxy to OpenRouter
-    try {
-      const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${env.OPENROUTER_API_KEY}`,
-          'HTTP-Referer': 'https://ljack.github.io/turboquant/',
-          'X-Title': 'TurboQuant Explainer',
-        },
-        body: JSON.stringify({
-          model: 'openrouter/free',
-          messages: trimmed,
-          max_tokens: 512,
-          temperature: 0.7,
-        }),
-      });
+    // Proxy to OpenRouter — try models in order
+    const models = [
+      'qwen/qwen3.6-plus-preview:free',
+      'arcee-ai/trinity-large-preview:free',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'openrouter/free',
+    ];
 
-      const data = await orRes.json();
+    for (const model of models) {
+      try {
+        const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${env.OPENROUTER_API_KEY}`,
+            'HTTP-Referer': 'https://ljack.github.io/turboquant/',
+            'X-Title': 'TurboQuant Explainer',
+          },
+          body: JSON.stringify({
+            model,
+            messages: trimmed,
+            max_tokens: 800,
+            temperature: 0.7,
+          }),
+        });
 
-      if (!orRes.ok) {
-        return json(
-          { error: data.error?.message || 'OpenRouter API error' },
-          orRes.status, origin, allowed
-        );
+        const data = await orRes.json();
+
+        // If rate limited or no endpoints, try next model
+        if (orRes.status === 429 || orRes.status === 404) continue;
+
+        // Check for empty/null content (thinking models wasting tokens)
+        const content = data.choices?.[0]?.message?.content;
+        if (orRes.ok && (!content || content.length < 2)) continue;
+
+        if (!orRes.ok) {
+          return json(
+            { error: data.error?.message || 'OpenRouter API error' },
+            orRes.status, origin, allowed
+          );
+        }
+
+        return json(data, 200, origin, allowed);
+      } catch (e) {
+        continue;
       }
-
-      return json(data, 200, origin, allowed);
-    } catch (e) {
-      return json({ error: 'Upstream error' }, 502, origin, allowed);
     }
+
+    return json({ error: 'All models unavailable. Try again shortly.' }, 503, origin, allowed);
   },
 };
 
