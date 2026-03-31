@@ -479,6 +479,98 @@ body {
   cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
 
+/* ─── Quiz ─── */
+.quiz-container { counter-reset: quiz-q; }
+.quiz-q {
+  counter-increment: quiz-q;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: white;
+  border: 1px solid var(--green-pale);
+  border-radius: var(--radius);
+}
+.quiz-q .q-text {
+  font-weight: 700;
+  font-size: 0.95em;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+.quiz-q .q-text::before {
+  content: counter(quiz-q) ". ";
+  color: var(--green-mid);
+  font-weight: 800;
+}
+.quiz-q .q-options { display: flex; flex-direction: column; gap: 6px; }
+.quiz-q .q-opt {
+  padding: 10px 14px;
+  border: 2px solid var(--green-pale);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: all 0.2s;
+  background: white;
+  color: var(--text);
+  text-align: left;
+  font-family: inherit;
+}
+.quiz-q .q-opt:hover:not(.chosen) { border-color: var(--green-mid); background: var(--green-bg); }
+.quiz-q .q-opt.chosen.correct {
+  border-color: #4a7c2e;
+  background: #e8f5e9;
+  color: #1b5e20;
+  font-weight: 600;
+}
+.quiz-q .q-opt.chosen.wrong {
+  border-color: #c62828;
+  background: #ffebee;
+  color: #b71c1c;
+  font-weight: 600;
+}
+.quiz-q .q-opt.reveal-correct {
+  border-color: #4a7c2e;
+  background: #e8f5e9;
+}
+.quiz-q .q-opt.locked { pointer-events: none; opacity: 0.7; }
+.quiz-q .q-opt.locked.chosen, .quiz-q .q-opt.locked.reveal-correct { opacity: 1; }
+.quiz-q .q-feedback {
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.85em;
+  line-height: 1.5;
+  display: none;
+}
+.quiz-q .q-feedback.visible { display: block; }
+.quiz-q .q-feedback.correct { background: #e8f5e9; color: #1b5e20; }
+.quiz-q .q-feedback.wrong { background: #ffebee; color: #b71c1c; }
+.quiz-q .q-feedback .ask-chat-btn {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 5px 14px;
+  background: var(--green-mid);
+  color: white;
+  border: none;
+  border-radius: 16px;
+  font-size: 0.85em;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+.quiz-q .q-feedback .ask-chat-btn:hover { background: var(--green-dark); }
+.quiz-score {
+  text-align: center;
+  padding: 20px;
+  background: linear-gradient(135deg, var(--green-mid), var(--green-light));
+  border-radius: var(--radius);
+  color: white;
+  font-size: 1.1em;
+  font-weight: 700;
+  margin-top: 20px;
+  display: none;
+}
+.quiz-score.visible { display: block; }
+.quiz-score .score-num { font-size: 2em; display: block; margin: 8px 0; }
+
 /* ─── Chat resize handle ─── */
 .chat-window {
   resize: none; /* we do custom resize */
@@ -646,6 +738,7 @@ code {
   <button data-step="5">5. QJL Error Fix</button>
   <button data-step="6">6. Full Pipeline</button>
   <button data-step="7">7. Results</button>
+  <button data-step="8">8. Quiz</button>
 </nav>
 
 <div class="main">
@@ -941,6 +1034,18 @@ code {
 
   <div class="good-stuff">
     <p><strong>The "no calibration" row is the killer feature.</strong> Every other method requires running representative data through the model to compute statistics. That means: you need a calibration dataset, the quantization is model-specific, and results can vary with the data you choose. TurboQuant's calibration is <em>pure mathematics</em> &mdash; the rotation makes the statistics known a priori. This is what makes it deployable at scale without per-model engineering effort.</p>
+  </div>
+</section>
+
+<!-- ════════════ STEP 8: Quiz ════════════ -->
+<section class="step" id="step8">
+  <h2><span class="step-number">8</span> Test Your Knowledge</h2>
+  <p class="subtitle">10 questions about TurboQuant. Pick an answer &mdash; TurboBot will explain why you're right or wrong.</p>
+
+  <div class="quiz-container" id="quizContainer"></div>
+  <div class="quiz-score" id="quizScore">
+    Your score: <span class="score-num" id="quizScoreNum"></span>
+    <span id="quizScoreMsg"></span>
   </div>
 </section>
 
@@ -2662,6 +2767,210 @@ async function handleSend() {
 
 chatSend.addEventListener('click', handleSend);
 chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleSend(); });
+
+// ═══════════════════════════════════════════
+//  STEP 8: Quiz
+// ═══════════════════════════════════════════
+const QUIZ = [
+  {
+    q: "What is the primary purpose of the KV cache in transformer models?",
+    opts: [
+      "Storing model weights for faster loading",
+      "Caching Key and Value vectors to avoid recomputation during generation",
+      "Compressing the input text before tokenization",
+      "Storing gradient values during backpropagation"
+    ],
+    correct: 1,
+    explain: "The KV cache stores Key and Value vectors for all previously processed tokens. Without it, the model would need to recompute K and V for every previous token at every generation step — turning linear cost into quadratic."
+  },
+  {
+    q: "Why does TurboQuant apply a random orthogonal rotation before quantizing?",
+    opts: [
+      "To reduce the dimensionality of the vectors",
+      "To encrypt the data for privacy",
+      "To spread vector energy uniformly, making coordinate statistics predictable",
+      "To convert floating-point values to integers"
+    ],
+    correct: 2,
+    explain: "The random rotation R spreads energy uniformly across all coordinates. Since R^T R = I, inner products are preserved exactly. The key benefit is that after rotation, each coordinate follows a known Beta distribution — so quantization levels can be precomputed without calibration data."
+  },
+  {
+    q: "What distribution do individual coordinates follow after TurboQuant's rotation step?",
+    opts: [
+      "Gaussian (Normal) distribution",
+      "Uniform distribution",
+      "Beta(1/2, (d-1)/2) distribution",
+      "Poisson distribution"
+    ],
+    correct: 2,
+    explain: "After rotation, each coordinate of a d-dimensional unit vector follows Beta(1/2, (d-1)/2). In high dimensions (d > 64), this concentrates tightly around its mean, making the distribution highly predictable — the foundation of calibration-free quantization."
+  },
+  {
+    q: "What makes TurboQuant fundamentally different from GPTQ, AWQ, and SqueezeLLM?",
+    opts: [
+      "It uses more bits per value",
+      "It requires no calibration data",
+      "It only works on small models",
+      "It quantizes activations instead of weights"
+    ],
+    correct: 1,
+    explain: "TurboQuant needs zero calibration data because the random rotation makes the statistics known a priori from pure mathematics. GPTQ, AWQ, and SqueezeLLM all require running representative data through the model to compute statistics, making them model-specific and data-dependent."
+  },
+  {
+    q: "What does the Lloyd-Max algorithm optimize in TurboQuant?",
+    opts: [
+      "The learning rate during training",
+      "The number of attention heads",
+      "The quantization levels to minimize mean squared error",
+      "The size of the random rotation matrix"
+    ],
+    correct: 2,
+    explain: "Lloyd-Max is an iterative algorithm that finds MSE-optimal scalar quantization levels for a known probability distribution. It alternates between placing decision boundaries at midpoints and moving reconstruction levels to centroids. Since the Beta distribution is known analytically, these levels are precomputed as a lookup table — zero runtime cost."
+  },
+  {
+    q: "Why is QJL (Quantized Johnson-Lindenstrauss) needed as a second stage?",
+    opts: [
+      "The rotation step loses information that must be recovered",
+      "MSE-optimal quantizers introduce systematic bias in inner product estimation",
+      "The Beta distribution is too wide for accurate quantization",
+      "GPU hardware requires a second compression pass"
+    ],
+    correct: 1,
+    explain: "MSE-optimal quantizers (from Lloyd-Max) minimize per-coordinate error but introduce systematic bias when estimating inner products. QJL fixes this by storing the sign of a random projection of the quantization residual — just 1 bit per dimension — giving an unbiased inner product estimator. The overhead is negligible."
+  },
+  {
+    q: "Approximately how much KV cache memory reduction does TurboQuant achieve?",
+    opts: [
+      "2x",
+      "4x",
+      "6x",
+      "20x"
+    ],
+    correct: 2,
+    explain: "TurboQuant achieves roughly 6x KV memory reduction (from FP16 to 3-bit quantization with 1-bit QJL overhead). This means a 70B model at 1M context that would need ~1.3 TB in FP16 drops to ~220 GB — fitting on a single 8×H100 node instead of a full server rack."
+  },
+  {
+    q: "What property must be preserved for attention to work correctly after KV cache compression?",
+    opts: [
+      "The exact bit patterns of each value",
+      "The L2 norm of each vector",
+      "The inner products between queries and keys (Q·K)",
+      "The order of tokens in the sequence"
+    ],
+    correct: 2,
+    explain: "Attention computes Q·K to determine which tokens are relevant. TurboQuant preserves inner products, not the raw vector values. This is a fundamentally weaker (and easier) requirement than element-wise accuracy — and it's why 3-bit compression works with near-zero quality loss."
+  },
+  {
+    q: "How close is TurboQuant to the theoretical best possible compression?",
+    opts: [
+      "It exceeds the theoretical limit",
+      "Within 2.7x of the information-theoretic lower bound",
+      "About 10x from optimal",
+      "The theoretical limit is unknown"
+    ],
+    correct: 1,
+    explain: "TurboQuant operates within 2.7x of the information-theoretic lower bound for inner product preservation under quantization. This means there's not much room for improvement — the algorithm is near-optimal in a provable mathematical sense."
+  },
+  {
+    q: "Why did TurboQuant's publication reportedly cause selloffs in memory chip stocks?",
+    opts: [
+      "It makes GPUs obsolete for AI inference",
+      "6x less inference memory means reduced demand for HBM chips",
+      "It requires proprietary memory chips from Google",
+      "It proves that AI models will shrink in size"
+    ],
+    correct: 1,
+    explain: "6x less KV cache memory means significantly reduced demand for HBM (High Bandwidth Memory) chips used in AI accelerators. Companies like Micron, Western Digital, and Lam Research saw stock selloffs. However, the counter-argument is that reduced costs could increase total AI deployment, potentially maintaining or increasing overall memory demand."
+  }
+];
+
+let quizAnswered = 0;
+let quizCorrect = 0;
+
+function buildQuiz() {
+  const container = document.getElementById('quizContainer');
+  QUIZ.forEach((q, qi) => {
+    const div = document.createElement('div');
+    div.className = 'quiz-q';
+    div.id = 'quiz-q-' + qi;
+
+    const qText = document.createElement('div');
+    qText.className = 'q-text';
+    qText.textContent = q.q;
+    div.appendChild(qText);
+
+    const optsDiv = document.createElement('div');
+    optsDiv.className = 'q-options';
+
+    q.opts.forEach((opt, oi) => {
+      const btn = document.createElement('button');
+      btn.className = 'q-opt';
+      btn.textContent = String.fromCharCode(65 + oi) + '. ' + opt;
+      btn.addEventListener('click', () => handleQuizAnswer(qi, oi));
+      optsDiv.appendChild(btn);
+    });
+    div.appendChild(optsDiv);
+
+    const feedback = document.createElement('div');
+    feedback.className = 'q-feedback';
+    div.appendChild(feedback);
+
+    container.appendChild(div);
+  });
+}
+
+function handleQuizAnswer(qi, oi) {
+  const q = QUIZ[qi];
+  const div = document.getElementById('quiz-q-' + qi);
+  const opts = div.querySelectorAll('.q-opt');
+  const feedback = div.querySelector('.q-feedback');
+  const isCorrect = oi === q.correct;
+
+  // Lock all options
+  opts.forEach((btn, i) => {
+    btn.classList.add('locked');
+    if (i === oi) btn.classList.add('chosen', isCorrect ? 'correct' : 'wrong');
+    if (i === q.correct && !isCorrect) btn.classList.add('reveal-correct');
+  });
+
+  // Show inline feedback
+  feedback.className = 'q-feedback visible ' + (isCorrect ? 'correct' : 'wrong');
+  const icon = isCorrect ? '\u2705' : '\u274c';
+  const verdict = isCorrect ? 'Correct!' : `Wrong — the answer is ${String.fromCharCode(65 + q.correct)}.`;
+  feedback.innerHTML = `<strong>${icon} ${verdict}</strong> ${q.explain}<br><button class="ask-chat-btn" data-qi="${qi}" data-oi="${oi}">Ask TurboBot to explain more</button>`;
+
+  feedback.querySelector('.ask-chat-btn').addEventListener('click', () => {
+    const chosenOpt = q.opts[oi];
+    const correctOpt = q.opts[q.correct];
+    const chatMsg = isCorrect
+      ? `I got quiz question ${qi + 1} right: "${q.q}" — I picked "${chosenOpt}". Can you explain the concept in more depth?`
+      : `I got quiz question ${qi + 1} wrong: "${q.q}" — I picked "${chosenOpt}" but the answer was "${correctOpt}". Can you explain why my answer was wrong and the correct answer is right?`;
+
+    pendingSelection = '';
+    chatInput.value = chatMsg;
+    chatWindow.classList.add('open');
+    handleSend();
+  });
+
+  // Update score
+  quizAnswered++;
+  if (isCorrect) quizCorrect++;
+
+  if (quizAnswered === QUIZ.length) {
+    const scoreDiv = document.getElementById('quizScore');
+    const scoreNum = document.getElementById('quizScoreNum');
+    const scoreMsg = document.getElementById('quizScoreMsg');
+    scoreDiv.classList.add('visible');
+    scoreNum.textContent = quizCorrect + ' / ' + QUIZ.length;
+    if (quizCorrect === 10) scoreMsg.textContent = 'Perfect! You\'re a TurboQuant expert.';
+    else if (quizCorrect >= 8) scoreMsg.textContent = 'Excellent! You really understand this paper.';
+    else if (quizCorrect >= 6) scoreMsg.textContent = 'Good job! Review the steps you missed.';
+    else if (quizCorrect >= 4) scoreMsg.textContent = 'Not bad — try re-reading the earlier sections.';
+    else scoreMsg.textContent = 'Keep learning! The explainer covers all these topics.';
+  }
+}
+
+buildQuiz();
 
 
 </script>
