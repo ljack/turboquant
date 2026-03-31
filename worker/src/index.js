@@ -50,28 +50,30 @@ export default {
     // Cap message count and token usage
     const trimmed = messages.slice(-12);
 
-    // Proxy to Groq
+    // Proxy to OpenRouter
     try {
-      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${env.GROQ_API_KEY}`,
+          'Authorization': `Bearer ${env.OPENROUTER_API_KEY}`,
+          'HTTP-Referer': 'https://ljack.github.io/turboquant/',
+          'X-Title': 'TurboQuant Explainer',
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'openrouter/free',
           messages: trimmed,
           max_tokens: 512,
           temperature: 0.7,
         }),
       });
 
-      const data = await groqRes.json();
+      const data = await orRes.json();
 
-      if (!groqRes.ok) {
+      if (!orRes.ok) {
         return json(
-          { error: data.error?.message || 'Groq API error' },
-          groqRes.status, origin, allowed
+          { error: data.error?.message || 'OpenRouter API error' },
+          orRes.status, origin, allowed
         );
       }
 

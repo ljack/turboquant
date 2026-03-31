@@ -1,0 +1,5 @@
+[     632ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://ljack.github.io/favicon.ico:0
+[   77435ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://turboquant-chat.jarkko-lietolahti.workers.dev/:0
+[   77436ms] [ERROR] Chat API error: Error: Invalid API Key
+    at getAIResponse (https://ljack.github.io/turboquant/:2006:13)
+    at async handleSend (https://ljack.github.io/turboquant/:2066:17) @ https://ljack.github.io/turboquant/:2013

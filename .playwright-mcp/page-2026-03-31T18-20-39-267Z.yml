@@ -1,0 +1,76 @@
+- generic [active] [ref=e1]:
+  - generic: 🌺
+  - generic: 🌺
+  - generic: 🍀
+  - generic: 🍀
+  - generic: 🌼
+  - generic: 🍀
+  - generic: 🌻
+  - generic: 🌿
+  - generic: 🍀
+  - generic: 🌻
+  - generic: 🌻
+  - generic: 🌺
+  - generic: 🌺
+  - generic: 🌺
+  - generic: 🌻
+  - generic [ref=e2]:
+    - heading "TurboQuant" [level=1] [ref=e3]
+    - generic [ref=e4]: Google's KV Cache Compression — An Interactive Visual Explainer
+    - link "ICLR 2026 • arXiv:2504.19874" [ref=e5] [cursor=pointer]:
+      - /url: https://arxiv.org/abs/2504.19874
+  - navigation [ref=e6]:
+    - button "0. The Problem" [ref=e7] [cursor=pointer]
+    - button "1. KV Cache 101" [ref=e8] [cursor=pointer]
+    - button "2. Random Rotation" [ref=e9] [cursor=pointer]
+    - button "3. Beta Distribution" [ref=e10] [cursor=pointer]
+    - button "4. Lloyd-Max Quantize" [ref=e11] [cursor=pointer]
+    - button "5. QJL Error Fix" [ref=e12] [cursor=pointer]
+    - button "6. Full Pipeline" [ref=e13] [cursor=pointer]
+    - button "7. Results" [ref=e14] [cursor=pointer]
+  - generic [ref=e15]:
+    - generic [ref=e16]:
+      - 'heading "0 The Problem: Memory Is the Bottleneck" [level=2] [ref=e17]':
+        - generic [ref=e18]: "0"
+        - text: "The Problem: Memory Is the Bottleneck"
+      - paragraph [ref=e19]: LLMs are smart, but they're memory hogs. During inference, the KV cache can eat more RAM than the model weights themselves.
+      - generic [ref=e20]:
+        - heading "Why should you care?" [level=3] [ref=e21]
+        - paragraph [ref=e22]:
+          - text: When an LLM generates text, it stores
+          - strong [ref=e23]: keys
+          - text: and
+          - strong [ref=e24]: values
+          - text: for every token it has seen so far. A 70B parameter model serving a 128K context window can require
+          - strong [ref=e25]: over 40GB
+          - text: of memory just for the KV cache — and that's
+          - emphasis [ref=e26]: per request
+          - text: . At 1M tokens, you're looking at
+          - strong [ref=e27]: 300+ GB
+          - text: just for KV — impossible without compression.
+        - paragraph [ref=e28]: "This means: fewer concurrent users, bigger GPU bills, and hard limits on context length."
+      - generic [ref=e31]:
+        - generic [ref=e32]: "Context length:"
+        - slider [ref=e33]: "32"
+        - generic [ref=e34]: 32K
+        - generic [ref=e35]: "Model size:"
+        - combobox [ref=e36]:
+          - option "7B"
+          - option "13B"
+          - option "70B" [selected]
+          - option "405B"
+      - generic [ref=e37]:
+        - text: THE GOOD STUFF
+        - paragraph [ref=e38]:
+          - strong [ref=e39]: This is why TurboQuant matters.
+          - text: It's not just an academic exercise — shrinking the KV cache by 6x means you can serve 6x more users on the same hardware, or fit contexts that were previously impossible. A 70B model at 1M context needs ~1.3 TB of KV cache in FP16 — that's a full server rack. With TurboQuant, it's ~220 GB — a single node. And it does this with
+          - emphasis [ref=e40]: zero retraining
+          - text: .
+    - text: THE GOOD STUFF THE GOOD STUFF THE GOOD STUFF THE GOOD STUFF THE GOOD STUFF THE GOOD STUFF THE GOOD STUFF
+  - button "Chat about TurboQuant" [ref=e41] [cursor=pointer]:
+    - img [ref=e42]
+  - generic [ref=e44]:
+    - text: Built for exploration • Based on
+    - link "TurboQuant (ICLR 2026)" [ref=e45] [cursor=pointer]:
+      - /url: https://arxiv.org/abs/2504.19874
+    - text: by Google Research
