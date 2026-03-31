@@ -405,6 +405,91 @@ body {
 }
 .chat-msg.user .sender { text-align: right; }
 
+/* ─── Markdown in chat ─── */
+.chat-msg.bot .bubble h1,.chat-msg.bot .bubble h2,.chat-msg.bot .bubble h3 {
+  color: var(--green-dark); margin: 10px 0 4px; font-size: 1.05em;
+}
+.chat-msg.bot .bubble h1 { font-size: 1.15em; }
+.chat-msg.bot .bubble p { margin: 4px 0; }
+.chat-msg.bot .bubble ul,.chat-msg.bot .bubble ol {
+  margin: 4px 0 4px 18px; padding: 0;
+}
+.chat-msg.bot .bubble li { margin: 2px 0; }
+.chat-msg.bot .bubble pre {
+  background: #1b2e0a; color: #c5e1a5; padding: 10px 12px;
+  border-radius: 8px; overflow-x: auto; font-size: 0.85em;
+  margin: 6px 0; line-height: 1.4;
+}
+.chat-msg.bot .bubble pre code {
+  background: none; padding: 0; color: inherit; font-weight: 400;
+}
+.chat-msg.bot .bubble blockquote {
+  border-left: 3px solid var(--green-pale); padding-left: 10px;
+  margin: 6px 0; color: var(--text-mid); font-style: italic;
+}
+.chat-msg.bot .bubble hr {
+  border: none; border-top: 1px solid var(--green-pale); margin: 8px 0;
+}
+.chat-msg.bot .bubble a { color: var(--green-mid); text-decoration: underline; }
+.chat-msg.bot .bubble table {
+  border-collapse: collapse; margin: 6px 0; font-size: 0.9em; width: 100%;
+}
+.chat-msg.bot .bubble th,.chat-msg.bot .bubble td {
+  border: 1px solid var(--green-pale); padding: 4px 8px; text-align: left;
+}
+.chat-msg.bot .bubble th { background: var(--green-bg); font-weight: 700; }
+
+/* ─── Chat illustrations ─── */
+.chat-viz {
+  margin: 8px 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--green-pale);
+  background: white;
+  cursor: pointer;
+  position: relative;
+  transition: box-shadow 0.2s;
+}
+.chat-viz:hover { box-shadow: 0 2px 12px var(--shadow); }
+.chat-viz canvas { display: block; width: 100%; height: auto; }
+.chat-viz .expand-hint {
+  position: absolute; bottom: 4px; right: 6px;
+  background: rgba(0,0,0,.45); color: white; font-size: 0.65em;
+  padding: 2px 7px; border-radius: 8px; pointer-events: none;
+}
+.chat-viz.inline-large canvas { max-height: none; }
+
+/* ─── Viz modal overlay ─── */
+.viz-modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 2000;
+  background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
+  align-items: center; justify-content: center;
+}
+.viz-modal-overlay.open { display: flex; }
+.viz-modal {
+  background: white; border-radius: var(--radius); padding: 20px;
+  max-width: 90vw; max-height: 90vh; overflow: auto;
+  box-shadow: 0 12px 48px rgba(0,0,0,.25); position: relative;
+}
+.viz-modal canvas { display: block; max-width: 100%; }
+.viz-modal .modal-close {
+  position: absolute; top: 8px; right: 12px;
+  background: var(--green-mid); color: white; border: none;
+  width: 28px; height: 28px; border-radius: 50%; font-size: 16px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+
+/* ─── Chat resize handle ─── */
+.chat-window {
+  resize: none; /* we do custom resize */
+}
+.chat-resize-handle {
+  position: absolute; bottom: 0; right: 0; width: 18px; height: 18px;
+  cursor: nwse-resize; z-index: 10;
+  background: linear-gradient(135deg, transparent 50%, var(--green-pale) 50%);
+  border-radius: 0 0 var(--radius) 0;
+}
+
 .chat-input-row {
   display: flex;
   border-top: 2px solid var(--green-pale);
@@ -867,6 +952,7 @@ code {
 </button>
 
 <div class="chat-window" id="chatWindow" style="bottom:90px;right:24px;">
+  <div class="chat-resize-handle" id="chatResizeHandle"></div>
   <div class="chat-header" id="chatDragHandle">
     <span class="chat-title">TurboQuant Chat</span>
     <button class="chat-close" id="chatCloseBtn">&times;</button>
@@ -890,6 +976,14 @@ code {
 
 <!-- Selection tooltip -->
 <div class="ask-tooltip" id="askTooltip">Ask TurboBot about this</div>
+
+<!-- Viz modal overlay -->
+<div class="viz-modal-overlay" id="vizModal">
+  <div class="viz-modal">
+    <button class="modal-close" id="vizModalClose">&times;</button>
+    <canvas id="vizModalCanvas" width="800" height="500"></canvas>
+  </div>
+</div>
 
 <div class="footer">
   Built for exploration &bull; Based on <a href="https://arxiv.org/abs/2504.19874" target="_blank">TurboQuant (ICLR 2026)</a> by Google Research
@@ -1824,7 +1918,7 @@ document.getElementById('benchSelect').addEventListener('change', drawResults);
 drawResults();
 
 // ═══════════════════════════════════════════
-//  Chat: Floatable, Draggable, AI-powered
+//  Chat: Floatable, Draggable, Resizable, AI-powered
 // ═══════════════════════════════════════════
 const chatToggle = document.getElementById('chatToggle');
 const chatWindow = document.getElementById('chatWindow');
@@ -1833,10 +1927,14 @@ const chatInput = document.getElementById('chatInput');
 const chatSend = document.getElementById('chatSendBtn');
 const chatMessages = document.getElementById('chatMessages');
 const chatDragHandle = document.getElementById('chatDragHandle');
+const chatResizeHandle = document.getElementById('chatResizeHandle');
 const askTooltip = document.getElementById('askTooltip');
 const selBadge = document.getElementById('selBadge');
 const selTextEl = document.getElementById('selText');
 const selClear = document.getElementById('selClear');
+const vizModal = document.getElementById('vizModal');
+const vizModalCanvas = document.getElementById('vizModalCanvas');
+const vizModalClose = document.getElementById('vizModalClose');
 
 let pendingSelection = '';
 let chatHistory = [];
@@ -1850,6 +1948,7 @@ chatClose.addEventListener('click', () => chatWindow.classList.remove('open'));
 // ── Drag ──
 let isDragging = false, dragOffX = 0, dragOffY = 0;
 chatDragHandle.addEventListener('mousedown', e => {
+  if (e.target.closest('.chat-close')) return;
   isDragging = true;
   const rect = chatWindow.getBoundingClientRect();
   dragOffX = e.clientX - rect.left;
@@ -1858,23 +1957,38 @@ chatDragHandle.addEventListener('mousedown', e => {
   e.preventDefault();
 });
 document.addEventListener('mousemove', e => {
-  if (!isDragging) return;
-  const x = e.clientX - dragOffX;
-  const y = e.clientY - dragOffY;
-  chatWindow.style.left = Math.max(0, x) + 'px';
-  chatWindow.style.top = Math.max(0, y) + 'px';
-  chatWindow.style.right = 'auto';
-  chatWindow.style.bottom = 'auto';
+  if (isDragging) {
+    chatWindow.style.left = Math.max(0, e.clientX - dragOffX) + 'px';
+    chatWindow.style.top = Math.max(0, e.clientY - dragOffY) + 'px';
+    chatWindow.style.right = 'auto';
+    chatWindow.style.bottom = 'auto';
+  }
+  if (isResizing) {
+    const w = Math.max(300, e.clientX - resizeStartRect.left);
+    const h = Math.max(350, e.clientY - resizeStartRect.top);
+    chatWindow.style.width = w + 'px';
+    chatWindow.style.height = h + 'px';
+  }
 });
 document.addEventListener('mouseup', () => {
   isDragging = false;
+  isResizing = false;
   chatDragHandle.style.cursor = 'grab';
+});
+
+// ── Resize ──
+let isResizing = false, resizeStartRect = null;
+chatResizeHandle.addEventListener('mousedown', e => {
+  isResizing = true;
+  resizeStartRect = chatWindow.getBoundingClientRect();
+  e.preventDefault();
+  e.stopPropagation();
 });
 
 // ── Text selection → tooltip ──
 let tooltipTimeout = null;
 document.addEventListener('mouseup', e => {
-  if (e.target.closest('.chat-window') || e.target.closest('.ask-tooltip')) return;
+  if (e.target.closest('.chat-window') || e.target.closest('.ask-tooltip') || e.target.closest('.viz-modal-overlay')) return;
   clearTimeout(tooltipTimeout);
   tooltipTimeout = setTimeout(() => {
     const sel = window.getSelection();
@@ -1893,9 +2007,7 @@ document.addEventListener('mouseup', e => {
 });
 
 document.addEventListener('mousedown', e => {
-  if (!e.target.closest('.ask-tooltip')) {
-    askTooltip.style.display = 'none';
-  }
+  if (!e.target.closest('.ask-tooltip')) askTooltip.style.display = 'none';
 });
 
 askTooltip.addEventListener('click', () => {
@@ -1903,8 +2015,6 @@ askTooltip.addEventListener('click', () => {
   if (!text) return;
   askTooltip.style.display = 'none';
   window.getSelection().removeAllRanges();
-
-  // Set pending selection and open chat
   pendingSelection = text;
   selTextEl.textContent = text.length > 80 ? text.slice(0, 80) + '...' : text;
   selBadge.classList.add('visible');
@@ -1919,7 +2029,341 @@ selClear.addEventListener('click', () => {
   chatInput.placeholder = 'Ask about TurboQuant...';
 });
 
-// ── AI Chat (via Cloudflare Worker proxy → Groq, with static KB fallback) ──
+// ── Viz modal ──
+let modalDrawFn = null;
+vizModalClose.addEventListener('click', () => vizModal.classList.remove('open'));
+vizModal.addEventListener('click', e => { if (e.target === vizModal) vizModal.classList.remove('open'); });
+
+function openVizModal(drawFn) {
+  vizModal.classList.add('open');
+  vizModalCanvas.width = 800;
+  vizModalCanvas.height = 500;
+  drawFn(vizModalCanvas, 800, 500);
+}
+
+// ═══════════════════════════════════════════
+//  Markdown Renderer
+// ═══════════════════════════════════════════
+function renderMarkdown(text) {
+  // Escape HTML
+  let s = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // Code blocks (``` ... ```)
+  s = s.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    return `<pre><code>${code.trim()}</code></pre>`;
+  });
+
+  // Tables
+  s = s.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)+)/gm, (_, header, sep, body) => {
+    const th = header.split('|').filter(c => c.trim()).map(c => `<th>${c.trim()}</th>`).join('');
+    const rows = body.trim().split('\n').map(row => {
+      const cells = row.split('|').filter(c => c.trim()).map(c => `<td>${c.trim()}</td>`).join('');
+      return `<tr>${cells}</tr>`;
+    }).join('');
+    return `<table><tr>${th}</tr>${rows}</table>`;
+  });
+
+  // Headings
+  s = s.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  s = s.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  s = s.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+  // Horizontal rules
+  s = s.replace(/^---+$/gm, '<hr>');
+
+  // Blockquotes
+  s = s.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+  // Unordered lists
+  s = s.replace(/^(\s*)[-*] (.+)$/gm, '$1<li>$2</li>');
+  s = s.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+
+  // Ordered lists
+  s = s.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+  // Inline: bold, italic, code, links
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  s = s.replace(/`(.+?)`/g, '<code>$1</code>');
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+  // Paragraphs: wrap loose lines
+  s = s.replace(/\n{2,}/g, '</p><p>');
+  s = s.replace(/\n/g, '<br>');
+
+  // Clean up
+  s = s.replace(/<\/ul><br>/g, '</ul>');
+  s = s.replace(/<br><ul>/g, '<ul>');
+  s = s.replace(/<br><h([123])>/g, '<h$1>');
+  s = s.replace(/<\/h([123])><br>/g, '</h$1>');
+  s = s.replace(/<br><hr>/g, '<hr>');
+  s = s.replace(/<hr><br>/g, '<hr>');
+  s = s.replace(/<br><pre>/g, '<pre>');
+  s = s.replace(/<\/pre><br>/g, '</pre>');
+  s = s.replace(/<br><table>/g, '<table>');
+  s = s.replace(/<\/table><br>/g, '</table>');
+  s = s.replace(/<br><blockquote>/g, '<blockquote>');
+  s = s.replace(/<\/blockquote><br>/g, '</blockquote>');
+
+  return s;
+}
+
+// ═══════════════════════════════════════════
+//  Illustration Renderers
+// ═══════════════════════════════════════════
+const VIZ_COLORS = ['#4a7c2e','#81d4fa','#f48fb1','#ce93d8','#ffb74d','#fff176','#7cb342','#e57373','#4dd0e1','#aed581'];
+
+function renderBarChart(canvas, w, h, data) {
+  const ctx = canvas.getContext('2d');
+  canvas.width = w; canvas.height = h;
+  ctx.clearRect(0, 0, w, h);
+
+  const labels = data.labels || [];
+  const values = data.values || [];
+  const title = data.title || '';
+  const n = labels.length;
+  if (n === 0) return;
+
+  const maxVal = Math.max(...values) * 1.2 || 1;
+  const plotL = 50, plotR = w - 20, plotT = title ? 40 : 20, plotB = h - 40;
+  const barW = Math.min(60, (plotR - plotL) / n - 8);
+
+  if (title) {
+    ctx.fillStyle = '#1b2e0a'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(title, w / 2, 20);
+  }
+
+  ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(plotL, plotB); ctx.lineTo(plotR, plotB); ctx.stroke();
+
+  labels.forEach((label, i) => {
+    const x = plotL + (i + 0.5) * ((plotR - plotL) / n) - barW / 2;
+    const barH = (values[i] / maxVal) * (plotB - plotT);
+    ctx.fillStyle = VIZ_COLORS[i % VIZ_COLORS.length];
+    ctx.beginPath(); ctx.roundRect(x, plotB - barH, barW, barH, 4); ctx.fill();
+    ctx.fillStyle = '#1b2e0a'; ctx.font = '600 10px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(label, x + barW / 2, plotB + 14);
+    ctx.fillStyle = VIZ_COLORS[i % VIZ_COLORS.length]; ctx.font = 'bold 11px system-ui';
+    ctx.fillText(values[i].toString(), x + barW / 2, plotB - barH - 8);
+  });
+}
+
+function renderDiagram(canvas, w, h, data) {
+  const ctx = canvas.getContext('2d');
+  canvas.width = w; canvas.height = h;
+  ctx.clearRect(0, 0, w, h);
+
+  const nodes = data.nodes || [];
+  const edges = data.edges || [];
+  const title = data.title || '';
+
+  if (title) {
+    ctx.fillStyle = '#1b2e0a'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(title, w / 2, 18);
+  }
+
+  // Auto-layout: arrange nodes in a row or grid
+  const n = nodes.length;
+  const cols = Math.min(n, Math.ceil(Math.sqrt(n) * 1.5));
+  const rows = Math.ceil(n / cols);
+  const boxW = Math.min(120, (w - 40) / cols - 20);
+  const boxH = 50;
+  const gapX = (w - cols * boxW) / (cols + 1);
+  const gapY = (h - (title ? 30 : 0) - rows * boxH) / (rows + 1);
+  const offsetY = title ? 30 : 0;
+
+  const positions = {};
+  nodes.forEach((node, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = gapX + col * (boxW + gapX);
+    const y = offsetY + gapY + row * (boxH + gapY);
+    positions[node.id || i] = { x: x + boxW / 2, y: y + boxH / 2, w: boxW, h: boxH };
+
+    ctx.fillStyle = VIZ_COLORS[i % VIZ_COLORS.length];
+    ctx.beginPath(); ctx.roundRect(x, y, boxW, boxH, 10); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    // Word wrap label
+    const lbl = node.label || node.id || '';
+    if (lbl.length > 14) {
+      const mid = Math.ceil(lbl.length / 2);
+      const sp = lbl.lastIndexOf(' ', mid);
+      const brk = sp > 0 ? sp : mid;
+      ctx.fillText(lbl.slice(0, brk), x + boxW / 2, y + boxH / 2 - 7);
+      ctx.fillText(lbl.slice(brk).trim(), x + boxW / 2, y + boxH / 2 + 7);
+    } else {
+      ctx.fillText(lbl, x + boxW / 2, y + boxH / 2);
+    }
+  });
+
+  // Draw edges
+  edges.forEach(edge => {
+    const from = positions[edge.from];
+    const to = positions[edge.to];
+    if (!from || !to) return;
+    ctx.strokeStyle = '#666'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(from.x, from.y + from.h / 2); ctx.lineTo(to.x, to.y - to.h / 2); ctx.stroke();
+    // Arrowhead
+    const angle = Math.atan2(to.y - to.h / 2 - from.y - from.h / 2, to.x - from.x);
+    const ax = to.x, ay = to.y - to.h / 2;
+    ctx.fillStyle = '#666';
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(ax - 8 * Math.cos(angle - 0.4), ay - 8 * Math.sin(angle - 0.4));
+    ctx.lineTo(ax - 8 * Math.cos(angle + 0.4), ay - 8 * Math.sin(angle + 0.4));
+    ctx.fill();
+    if (edge.label) {
+      ctx.fillStyle = '#333'; ctx.font = '600 9px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(edge.label, (from.x + to.x) / 2 + 10, (from.y + from.h / 2 + to.y - to.h / 2) / 2);
+    }
+  });
+}
+
+function renderAnimation(canvas, w, h, data) {
+  const ctx = canvas.getContext('2d');
+  canvas.width = w; canvas.height = h;
+
+  const frames = data.frames || [];
+  const title = data.title || '';
+  const intervalMs = data.interval || 1200;
+  let frameIdx = 0;
+  let animId = null;
+
+  function drawFrame() {
+    ctx.clearRect(0, 0, w, h);
+    if (title) {
+      ctx.fillStyle = '#1b2e0a'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(title, w / 2, 18);
+    }
+
+    const frame = frames[frameIdx];
+    if (!frame) return;
+
+    // Draw frame elements
+    (frame.elements || []).forEach(el => {
+      ctx.fillStyle = el.color || VIZ_COLORS[0];
+      if (el.type === 'rect') {
+        ctx.beginPath(); ctx.roundRect(el.x, el.y, el.w, el.h, el.r || 6); ctx.fill();
+      } else if (el.type === 'circle') {
+        ctx.beginPath(); ctx.arc(el.x, el.y, el.r || 20, 0, Math.PI * 2); ctx.fill();
+      } else if (el.type === 'text') {
+        ctx.fillStyle = el.color || '#1b2e0a';
+        ctx.font = (el.bold ? 'bold ' : '') + (el.size || 12) + 'px system-ui';
+        ctx.textAlign = el.align || 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(el.text, el.x, el.y);
+      } else if (el.type === 'line') {
+        ctx.strokeStyle = el.color || '#666'; ctx.lineWidth = el.width || 2;
+        ctx.beginPath(); ctx.moveTo(el.x1, el.y1); ctx.lineTo(el.x2, el.y2); ctx.stroke();
+      }
+    });
+
+    // Frame label
+    if (frame.label) {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'left';
+      ctx.fillText(`Step ${frameIdx + 1}/${frames.length}: ${frame.label}`, 10, h - 12);
+    }
+
+    // Progress dots
+    const dotY = h - 30;
+    frames.forEach((_, i) => {
+      ctx.fillStyle = i === frameIdx ? '#4a7c2e' : '#ccc';
+      ctx.beginPath(); ctx.arc(w / 2 + (i - frames.length / 2) * 16, dotY, 4, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+
+  drawFrame();
+  if (frames.length > 1) {
+    animId = setInterval(() => {
+      frameIdx = (frameIdx + 1) % frames.length;
+      drawFrame();
+    }, intervalMs);
+    // Store cleanup ref on canvas
+    canvas._animCleanup = () => clearInterval(animId);
+  }
+}
+
+function renderCanvasCode(canvas, w, h, data) {
+  const ctx = canvas.getContext('2d');
+  canvas.width = w; canvas.height = h;
+  ctx.clearRect(0, 0, w, h);
+
+  const code = data.code || '';
+  try {
+    // Sandboxed execution with limited API
+    const fn = new Function('ctx', 'w', 'h', 'colors', code);
+    fn(ctx, w, h, VIZ_COLORS);
+  } catch (e) {
+    ctx.fillStyle = '#e57373'; ctx.font = '12px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText('Drawing error: ' + e.message, w / 2, h / 2);
+  }
+}
+
+// Parse special viz blocks from AI response
+function extractVizBlocks(text) {
+  const blocks = [];
+  const vizPattern = /```(bar-chart|diagram|animation|canvas)\n([\s\S]*?)```/g;
+  let match;
+  let lastIdx = 0;
+  const parts = [];
+
+  while ((match = vizPattern.exec(text)) !== null) {
+    if (match.index > lastIdx) {
+      parts.push({ type: 'text', content: text.slice(lastIdx, match.index) });
+    }
+    let vizData;
+    try {
+      vizData = JSON.parse(match[2].trim());
+    } catch {
+      vizData = { code: match[2].trim() };
+    }
+    parts.push({ type: match[1], data: vizData });
+    lastIdx = match.index + match[0].length;
+  }
+  if (lastIdx < text.length) {
+    parts.push({ type: 'text', content: text.slice(lastIdx) });
+  }
+  return parts.length > 0 ? parts : [{ type: 'text', content: text }];
+}
+
+function createVizElement(vizType, vizData) {
+  const container = document.createElement('div');
+  container.className = 'chat-viz';
+
+  const chatRect = chatWindow.getBoundingClientRect();
+  const isWide = chatRect.width > 500;
+  const smallW = isWide ? Math.min(chatRect.width - 60, 500) : 260;
+  const smallH = isWide ? 200 : 140;
+
+  const canvas = document.createElement('canvas');
+  container.appendChild(canvas);
+
+  const hint = document.createElement('div');
+  hint.className = 'expand-hint';
+  hint.textContent = 'Click to expand';
+  container.appendChild(hint);
+
+  const drawFn = (c, w, h) => {
+    switch (vizType) {
+      case 'bar-chart': renderBarChart(c, w, h, vizData); break;
+      case 'diagram': renderDiagram(c, w, h, vizData); break;
+      case 'animation': renderAnimation(c, w, h, vizData); break;
+      case 'canvas': renderCanvasCode(c, w, h, vizData); break;
+    }
+  };
+
+  drawFn(canvas, smallW, smallH);
+
+  container.addEventListener('click', () => {
+    openVizModal((modalCanvas, mw, mh) => {
+      if (canvas._animCleanup) canvas._animCleanup();
+      drawFn(modalCanvas, mw, mh);
+    });
+  });
+
+  return container;
+}
+
+// ── AI Chat (via Cloudflare Worker proxy → OpenRouter, with static KB fallback) ──
 const WORKER_URL = 'https://turboquant-chat.jarkko-lietolahti.workers.dev';
 
 const SYSTEM_PROMPT = `You are TurboBot, an expert assistant embedded in an interactive TurboQuant explainer page. TurboQuant is Google's ICLR 2026 algorithm for KV cache compression in LLMs.
@@ -1936,7 +2380,43 @@ Key facts you know deeply:
 - Near-optimal: within 2.7x of information-theoretic lower bound.
 - Caused memory chip stock selloffs (Micron, WD, Lam Research).
 
-Be concise but insightful. When the user selects text from the page, explain it clearly. Adapt depth to the question — brief for simple questions, detailed for technical ones. You can discuss any ML/AI topic, not just TurboQuant.`;
+Be concise but insightful. When the user selects text from the page, explain it clearly. Adapt depth to the question — brief for simple questions, detailed for technical ones. You can discuss any ML/AI topic, not just TurboQuant.
+
+## ILLUSTRATION TOOLS
+
+You can embed visual illustrations in your responses using fenced code blocks with special types. Use these when a visual would help explain a concept. Available tools:
+
+### bar-chart
+\`\`\`bar-chart
+{"title": "Memory Usage Comparison", "labels": ["FP16", "TQ 4-bit", "TQ 3-bit"], "values": [100, 25, 17]}
+\`\`\`
+
+### diagram (flow/architecture diagrams with nodes and edges)
+\`\`\`diagram
+{"title": "TurboQuant Pipeline", "nodes": [{"id": "a", "label": "Raw KV Vector"}, {"id": "b", "label": "Rotate"}, {"id": "c", "label": "Quantize"}], "edges": [{"from": "a", "to": "b", "label": "R×v"}, {"from": "b", "to": "c"}]}
+\`\`\`
+
+### animation (step-by-step animated frames)
+\`\`\`animation
+{"title": "Rotation Effect", "interval": 1500, "frames": [
+  {"label": "Before rotation", "elements": [{"type": "rect", "x": 50, "y": 30, "w": 120, "h": 20, "color": "#f48fb1"}, {"type": "rect", "x": 50, "y": 60, "w": 30, "h": 20, "color": "#81d4fa"}, {"type": "text", "text": "Spiky coordinates", "x": 150, "y": 110, "size": 12}]},
+  {"label": "After rotation", "elements": [{"type": "rect", "x": 50, "y": 30, "w": 70, "h": 20, "color": "#7cb342"}, {"type": "rect", "x": 50, "y": 60, "w": 65, "h": 20, "color": "#7cb342"}, {"type": "text", "text": "Uniform coordinates", "x": 150, "y": 110, "size": 12}]}
+]}
+\`\`\`
+
+### canvas (arbitrary JavaScript drawing — you write ctx commands)
+\`\`\`canvas
+{"code": "ctx.fillStyle='#4a7c2e'; ctx.font='bold 16px system-ui'; ctx.textAlign='center'; ctx.fillText('Hello!', w/2, h/2); ctx.beginPath(); ctx.arc(w/2, h/2+30, 20, 0, Math.PI*2); ctx.fillStyle='#81d4fa'; ctx.fill();"}
+\`\`\`
+
+IMPORTANT RULES FOR ILLUSTRATIONS:
+- Use illustrations proactively when they would clarify an explanation
+- Keep JSON valid — double-quote all keys and string values
+- For canvas code, use single quotes inside the code string
+- canvas has: ctx (2d context), w (width), h (height), colors (array of 10 nice colors)
+- Animations should have 2-6 frames
+- Always include surrounding text explanation — don't just show a chart alone
+- Use them naturally, not for every response — only when visual aids genuinely help`;
 
 // Static fallback KB
 const chatKB = {
@@ -2023,19 +2503,32 @@ async function getAIResponse(userMsg, selectedText) {
 function addMessage(text, isUser) {
   const div = document.createElement('div');
   div.className = `chat-msg ${isUser ? 'user' : 'bot'}`;
-  // Simple markdown-ish formatting for bot messages
-  let html = text;
-  if (!isUser) {
-    html = text
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/`(.+?)`/g, '<code>$1</code>')
-      .replace(/\n/g, '<br>');
+
+  const senderEl = document.createElement('div');
+  senderEl.className = 'sender';
+  senderEl.textContent = isUser ? 'You' : 'TurboBot';
+  div.appendChild(senderEl);
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+
+  if (isUser) {
+    bubble.textContent = text;
   } else {
-    html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Parse viz blocks and markdown
+    const parts = extractVizBlocks(text);
+    for (const part of parts) {
+      if (part.type === 'text') {
+        const span = document.createElement('span');
+        span.innerHTML = renderMarkdown(part.content.trim());
+        bubble.appendChild(span);
+      } else {
+        bubble.appendChild(createVizElement(part.type, part.data));
+      }
+    }
   }
-  div.innerHTML = `<div class="sender">${isUser ? 'You' : 'TurboBot'}</div><div class="bubble">${html}</div>`;
+
+  div.appendChild(bubble);
   chatMessages.appendChild(div);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
