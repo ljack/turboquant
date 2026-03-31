@@ -1919,7 +1919,9 @@ selClear.addEventListener('click', () => {
   chatInput.placeholder = 'Ask about TurboQuant...';
 });
 
-// ── AI Chat (Groq free API with fallback to static KB) ──
+// ── AI Chat (via Cloudflare Worker proxy → Groq, with static KB fallback) ──
+const WORKER_URL = 'https://turboquant-chat.jarkko-lietolahti.workers.dev';
+
 const SYSTEM_PROMPT = `You are TurboBot, an expert assistant embedded in an interactive TurboQuant explainer page. TurboQuant is Google's ICLR 2026 algorithm for KV cache compression in LLMs.
 
 Key facts you know deeply:
@@ -1936,9 +1938,6 @@ Key facts you know deeply:
 
 Be concise but insightful. When the user selects text from the page, explain it clearly. Adapt depth to the question — brief for simple questions, detailed for technical ones. You can discuss any ML/AI topic, not just TurboQuant.`;
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-let groqApiKey = localStorage.getItem('turboquant_groq_key') || '';
-
 // Static fallback KB
 const chatKB = {
   'kv cache': 'The KV cache stores Key and Value vectors for all previously processed tokens. During autoregressive generation, when the model generates token N, it needs attention scores against all tokens 1..N-1. Without caching, you\'d recompute K and V for every previous token at every step \u2014 quadratic cost. The cache makes it linear, but at the cost of memory that grows with sequence length. At 1M token contexts, a 70B model needs over 1 TB of KV cache in FP16 \u2014 that\'s where TurboQuant\'s 6x compression becomes essential.',
@@ -1953,7 +1952,7 @@ const chatKB = {
   'inner product': 'Attention computes Q\u00B7K to determine which tokens are relevant. TurboQuant preserves inner products, not raw values. This weaker requirement is why 3-bit compression works.',
   'market': 'TurboQuant caused memory chip stock selloffs (Micron, WD, Lam Research) because 6x less inference memory means reduced HBM demand. But reduced costs could also increase total AI deployment.',
   'comparison': 'vs GPTQ/AWQ: those quantize weights, not KV cache, and need calibration. vs KIVI: needs per-channel stats. TurboQuant is unique in needing zero calibration while achieving near-perfect quality at 3 bits.',
-  'help': 'I can discuss: KV cache, quantization, rotation, Beta distribution, Lloyd-Max, QJL, PolarQuant, calibration, inference speedups, inner products, market impact, comparisons, and more. For richer answers, add a Groq API key (free) via the \u2699\uFE0F button!',
+  'help': 'I can discuss: KV cache, quantization, rotation, Beta distribution, Lloyd-Max, QJL, PolarQuant, calibration, inference speedups, inner products, market impact, comparisons, and more!',
 };
 
 function findStaticResponse(msg) {
@@ -1969,12 +1968,12 @@ function findStaticResponse(msg) {
   }
   if (bestScore >= 3 && bestMatch) return bestMatch;
   if (lower.includes('hello') || lower.includes('hi ') || lower === 'hi')
-    return 'Hey there! Ask me anything about TurboQuant. For AI-powered answers, add a free Groq API key via the \u2699\uFE0F button in the chat header!';
+    return 'Hey there! Ask me anything about TurboQuant \u2014 how it works, why each step matters, how it compares to other methods, or even its market impact.';
   if (lower.includes('how') && lower.includes('work'))
     return 'TurboQuant: (1) Random rotation \u2192 uniform coordinates, (2) Lloyd-Max quantizes to 3 bits using predictable Beta distribution, (3) QJL adds 1-bit unbiased error correction. Zero calibration, zero retraining, faster inference.';
   if (lower.includes('thank'))
     return 'You\'re welcome! Happy to nerd out about quantization anytime.';
-  return 'I can answer questions about TurboQuant\'s algorithm, KV caches, quantization, and more. For deeper AI-powered conversations, add a free Groq API key via the \u2699\uFE0F button!';
+  return 'I can answer questions about TurboQuant\'s algorithm, KV caches, quantization, and more. Try asking about a specific topic!';
 }
 
 async function getAIResponse(userMsg, selectedText) {
@@ -1993,43 +1992,27 @@ async function getAIResponse(userMsg, selectedText) {
   }
   messages.push({ role: 'user', content: fullMsg });
 
-  if (!groqApiKey) {
-    // Fallback to static
-    const response = findStaticResponse((selectedText || '') + ' ' + userMsg);
-    chatHistory.push({ role: 'user', content: fullMsg });
-    chatHistory.push({ role: 'assistant', content: response });
-    return response;
-  }
-
   try {
-    const res = await fetch(GROQ_API_URL, {
+    const res = await fetch(WORKER_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${groqApiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages,
-        max_tokens: 512,
-        temperature: 0.7,
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages }),
     });
 
+    const data = await res.json();
+
     if (!res.ok) {
-      const err = await res.text();
-      if (res.status === 401) return 'API key invalid. Please update it via the \u2699\uFE0F button.';
-      throw new Error(err);
+      if (res.status === 429) return data.error || 'Rate limited. Try again in a few minutes.';
+      throw new Error(data.error || 'API error');
     }
 
-    const data = await res.json();
     const reply = data.choices?.[0]?.message?.content || 'No response received.';
     chatHistory.push({ role: 'user', content: fullMsg });
     chatHistory.push({ role: 'assistant', content: reply });
     return reply;
   } catch (e) {
-    console.error('Groq API error:', e);
-    // Fallback to static
+    console.error('Chat API error:', e);
+    // Fallback to static KB
     const response = findStaticResponse((selectedText || '') + ' ' + userMsg);
     chatHistory.push({ role: 'user', content: fullMsg });
     chatHistory.push({ role: 'assistant', content: response });
@@ -2088,31 +2071,6 @@ async function handleSend() {
 chatSend.addEventListener('click', handleSend);
 chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleSend(); });
 
-// ── API key settings button ──
-const settingsBtn = document.createElement('button');
-settingsBtn.className = 'chat-close';
-settingsBtn.title = 'Set Groq API key for AI-powered chat';
-settingsBtn.textContent = '\u2699\uFE0F';
-settingsBtn.style.marginRight = '4px';
-settingsBtn.style.fontSize = '16px';
-chatDragHandle.insertBefore(settingsBtn, chatClose);
-
-settingsBtn.addEventListener('click', e => {
-  e.stopPropagation();
-  const current = groqApiKey ? '(key is set)' : '(no key)';
-  const key = prompt(
-    `Enter your free Groq API key for AI-powered chat.\n\nGet one free at: https://console.groq.com/keys\n\nCurrent: ${current}\n\nLeave empty to clear and use built-in knowledge base.`
-  );
-  if (key === null) return; // cancelled
-  groqApiKey = key.trim();
-  if (groqApiKey) {
-    localStorage.setItem('turboquant_groq_key', groqApiKey);
-    addMessage('Groq API key set! I\'m now powered by Llama 3.3 70B. Ask me anything!', false);
-  } else {
-    localStorage.removeItem('turboquant_groq_key');
-    addMessage('API key cleared. Using built-in knowledge base.', false);
-  }
-});
 
 </script>
 </body>
