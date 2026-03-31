@@ -1087,9 +1087,10 @@ drawMemoryChart();
 // ═══════════════════════════════════════════
 //  STEP 1: KV Cache Visualization
 // ═══════════════════════════════════════════
-let kvAnimRunning = false;
+let kvAnimId = null;
+let kvAnimPhase = -1; // -1 = static, 0..n = scanning keys, n+1 = show scores, n+2 = pull values
 
-function drawKVCache() {
+function drawKVCache(animHighlight) {
   const canvas = document.getElementById('kvCacheViz');
   const ctx = clearCanvas(canvas);
   const W = canvas.width, H = canvas.height;
@@ -1099,6 +1100,13 @@ function drawKVCache() {
   const boxW = Math.min(60, (W - 100) / nTokens - 4);
   const boxH = 28;
   const startX = (W - nTokens * (boxW + 4)) / 2;
+
+  // Generate stable random attention scores for this token count
+  const seed = nTokens * 7;
+  const rawScores = [];
+  for (let i = 0; i < nTokens; i++) rawScores.push(Math.abs(Math.sin(seed + i * 3.7 + 1.3)));
+  const maxRaw = Math.max(...rawScores);
+  const attnScores = rawScores.map(s => s / (maxRaw * 1.2)); // normalize, keep some variation
 
   // Draw token labels
   drawText(ctx, 'Tokens', W / 2, 10, { size: 13, weight: '700' });
@@ -1113,27 +1121,108 @@ function drawKVCache() {
   drawText(ctx, 'Keys (K)', 40, 90, { size: 12, weight: '700', color: '#0288d1', align: 'left' });
   for (let i = 0; i < nTokens; i++) {
     const x = startX + i * (boxW + 4);
-    drawBar(ctx, x, 85, boxW, boxH, COLORS.sky);
+    const isScanned = animHighlight !== undefined && i <= animHighlight && animHighlight < nTokens;
+    const isHit = animHighlight !== undefined && animHighlight >= nTokens;
+    let color = COLORS.sky;
+    if (isScanned) color = '#0288d1';
+    if (isHit) {
+      // Show attention intensity via opacity
+      const alpha = 0.3 + attnScores[i] * 0.7;
+      color = `rgba(2, 136, 209, ${alpha})`;
+    }
+    drawBar(ctx, x, 85, boxW, boxH, color);
+    // Show attention score
+    if (isHit) {
+      drawText(ctx, attnScores[i].toFixed(2), x + boxW / 2, 75, { size: 8, weight: '700', color: '#0288d1' });
+    }
   }
 
   // Values row
   drawText(ctx, 'Values (V)', 40, 140, { size: 12, weight: '700', color: '#c2185b', align: 'left' });
+  const showValues = animHighlight !== undefined && animHighlight >= nTokens + 1;
   for (let i = 0; i < nTokens; i++) {
     const x = startX + i * (boxW + 4);
-    drawBar(ctx, x, 135, boxW, boxH, COLORS.pink);
+    let color = COLORS.pink;
+    if (showValues) {
+      const alpha = 0.2 + attnScores[i] * 0.8;
+      color = `rgba(244, 143, 177, ${alpha})`;
+    }
+    drawBar(ctx, x, 135, boxW, boxH, color);
+  }
+
+  // Draw lines from query to keys during scanning
+  const qX = W / 2, qY = 202;
+  if (animHighlight !== undefined && animHighlight < nTokens) {
+    // Draw line from Q to current key being scanned
+    const tx = startX + animHighlight * (boxW + 4) + boxW / 2;
+    ctx.strokeStyle = COLORS.green;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(qX, qY);
+    ctx.lineTo(tx, 85 + boxH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Dot at key
+    ctx.fillStyle = COLORS.green;
+    ctx.beginPath(); ctx.arc(tx, 85 + boxH, 4, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Draw weighted lines from values to output during value phase
+  if (showValues) {
+    const outX = W / 2, outY = 240;
+    for (let i = 0; i < nTokens; i++) {
+      if (attnScores[i] > 0.3) {
+        const vx = startX + i * (boxW + 4) + boxW / 2;
+        ctx.strokeStyle = `rgba(194, 24, 91, ${attnScores[i]})`;
+        ctx.lineWidth = attnScores[i] * 4;
+        ctx.beginPath();
+        ctx.moveTo(vx, 135 + boxH);
+        ctx.lineTo(outX, outY);
+        ctx.stroke();
+      }
+    }
+    drawBar(ctx, outX - boxW / 2, outY, boxW, boxH, COLORS.lavender, 6);
+    drawText(ctx, 'output', outX, outY + 6, { size: 9, weight: '700' });
   }
 
   // Query
+  const phase = animHighlight !== undefined ? (animHighlight < nTokens ? 'Comparing Q with keys...' : animHighlight === nTokens ? 'Softmax → attention scores' : 'Weighted sum of values → output') : '';
   drawText(ctx, 'New Query (Q)', W / 2, 185, { size: 12, weight: '700', color: COLORS.green });
   drawBar(ctx, W / 2 - boxW / 2, 202, boxW, boxH, COLORS.greenLight);
   drawText(ctx, 'q', W / 2, 208, { size: 10, weight: '700' });
 
-  // Attention scores
-  drawText(ctx, 'Attention = softmax(Q \u00B7 K\u1D40 / \u221Ad)', W / 2, 248, { size: 12, weight: '600' });
+  // Status / formula
+  if (phase) {
+    drawText(ctx, phase, W / 2, H - 10, { size: 12, weight: '700', color: COLORS.green });
+  } else {
+    drawText(ctx, 'Attention = softmax(Q \u00B7 K\u1D40 / \u221Ad)', W / 2, H - 10, { size: 12, weight: '600' });
+  }
 }
 
-document.getElementById('tokenSlider').addEventListener('input', drawKVCache);
-document.getElementById('kvAnimBtn').addEventListener('click', () => drawKVCache());
+function startKVAnimation() {
+  const nTokens = +document.getElementById('tokenSlider').value;
+  if (kvAnimId) { clearInterval(kvAnimId); kvAnimId = null; }
+  kvAnimPhase = 0;
+  const totalPhases = nTokens + 3; // scan each key + show scores + pull values + hold
+
+  kvAnimId = setInterval(() => {
+    drawKVCache(kvAnimPhase);
+    kvAnimPhase++;
+    if (kvAnimPhase >= totalPhases) {
+      clearInterval(kvAnimId);
+      kvAnimId = null;
+      // Hold final frame for 2s then reset
+      setTimeout(() => { if (!kvAnimId) drawKVCache(); }, 2500);
+    }
+  }, 250);
+}
+
+document.getElementById('tokenSlider').addEventListener('input', () => {
+  if (kvAnimId) { clearInterval(kvAnimId); kvAnimId = null; }
+  drawKVCache();
+});
+document.getElementById('kvAnimBtn').addEventListener('click', startKVAnimation);
 drawKVCache();
 
 // ═══════════════════════════════════════════
