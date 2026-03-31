@@ -606,6 +606,16 @@ body {
 }
 .chat-input-row button:hover { background: var(--green-dark); }
 .typing-indicator { color: var(--text-light); font-style: italic; font-size: 0.82em; padding: 4px 0; }
+.stream-cursor::after {
+  content: '\u258C';
+  animation: cursorBlink 0.7s infinite;
+  color: var(--green-mid);
+  font-weight: 400;
+}
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
 
 /* ─── Misc ─── */
 code {
@@ -2817,16 +2827,18 @@ async function handleSend() {
 
   // Create streaming bot message
   const { div: botDiv, bubble } = createStreamingMessage();
-  bubble.innerHTML = '<span class="typing-indicator">TurboBot is thinking...</span>';
+  bubble.classList.add('stream-cursor');
   chatMessages.scrollTop = chatMessages.scrollHeight;
 
   try {
     const reply = await streamResponse(messages, bubble);
+    bubble.classList.remove('stream-cursor');
     if (!reply || reply.length < 2) throw new Error('Empty response');
     chatHistory.push({ role: 'user', content: fullMsg });
     chatHistory.push({ role: 'assistant', content: reply });
   } catch (e) {
     console.error('Chat API error:', e);
+    bubble.classList.remove('stream-cursor');
     // Fallback to static KB
     const response = findStaticResponse((selectedCtx || '') + ' ' + msg);
     chatHistory.push({ role: 'user', content: fullMsg });

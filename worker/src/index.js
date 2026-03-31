@@ -86,6 +86,7 @@ async function handleStreaming(messages, models, env, origin, allowed) {
           max_tokens: 800,
           temperature: 0.7,
           stream: true,
+          reasoning: { effort: 'none' },
         }),
       });
 
@@ -173,6 +174,7 @@ async function handleNonStreaming(messages, models, env, origin, allowed) {
           messages,
           max_tokens: 800,
           temperature: 0.7,
+          reasoning: { effort: 'none' },
         }),
       });
 
