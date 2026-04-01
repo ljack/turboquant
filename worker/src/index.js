@@ -55,13 +55,16 @@ export default {
 
     // Allowed free models (whitelist for safety)
     const allowedModels = [
-      'qwen/qwen3.6-plus-preview:free',
       'arcee-ai/trinity-large-preview:free',
+      'nvidia/nemotron-3-super-120b-a12b:free',
+      'nvidia/nemotron-3-nano-30b-a3b:free',
+      'minimax/minimax-m2.5:free',
       'meta-llama/llama-3.3-70b-instruct:free',
       'google/gemma-3-27b-it:free',
       'mistralai/mistral-small-3.2-24b-instruct:free',
+      'liquid/lfm-2.5-1.2b-instruct:free',
+      'qwen/qwen3.6-plus-preview:free',
       'deepseek/deepseek-r1-0528:free',
-      'openrouter/free',
     ];
 
     // If user picked a specific model, use just that; otherwise fallback chain
@@ -70,10 +73,11 @@ export default {
       models = [requestedModel];
     } else {
       models = [
-        'qwen/qwen3.6-plus-preview:free',
         'arcee-ai/trinity-large-preview:free',
+        'nvidia/nemotron-3-super-120b-a12b:free',
+        'minimax/minimax-m2.5:free',
         'meta-llama/llama-3.3-70b-instruct:free',
-        'openrouter/free',
+        'liquid/lfm-2.5-1.2b-instruct:free',
       ];
     }
 
@@ -103,7 +107,6 @@ async function handleStreaming(messages, models, env, origin, allowed) {
           max_tokens: 800,
           temperature: 0.7,
           stream: true,
-          reasoning: { effort: 'none' },
         }),
       });
 
@@ -191,23 +194,16 @@ async function handleNonStreaming(messages, models, env, origin, allowed) {
           messages,
           max_tokens: 800,
           temperature: 0.7,
-          reasoning: { effort: 'none' },
         }),
       });
 
       const data = await orRes.json();
 
-      if (orRes.status === 429 || orRes.status === 404) continue;
+      // Skip this model on any error or empty response — try next in chain
+      if (!orRes.ok) continue;
 
       const content = data.choices?.[0]?.message?.content;
-      if (orRes.ok && (!content || content.length < 2)) continue;
-
-      if (!orRes.ok) {
-        return json(
-          { error: data.error?.message || 'OpenRouter API error' },
-          orRes.status, origin, allowed
-        );
-      }
+      if (!content || content.length < 2) continue;
 
       return json(data, 200, origin, allowed);
     } catch (e) {
